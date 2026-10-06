@@ -1,0 +1,10 @@
+{
+  "name": "Remix BeamDrop - Peer-to-Peer Encrypted File Transfer",
+  "description": "Transfer files seamlessly between mobile, PC, and laptop via QR code with zero-knowledge end-to-end encryption.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
