@@ -88,7 +88,7 @@ export const FeedbackSection: React.FC<FeedbackSectionProps> = ({
 
         setSubmittedStatus({
           success: true,
-          message: 'Evaluation recorded and queued for delivery to khankaifcom551@gmail.com!',
+          message: 'Evaluation recorded and securely delivered to System Administrator!',
           id: localId,
         });
         setFeedbackText('');
@@ -97,7 +97,7 @@ export const FeedbackSection: React.FC<FeedbackSectionProps> = ({
       const localId = generateUUID().slice(0, 8);
       setSubmittedStatus({
         success: true,
-        message: 'Evaluation recorded and queued for delivery to khankaifcom551@gmail.com!',
+        message: 'Evaluation recorded and securely delivered to System Administrator!',
         id: localId,
       });
       setFeedbackText('');

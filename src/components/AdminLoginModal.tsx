@@ -10,8 +10,6 @@ interface AdminLoginModalProps {
   onSuccess: (session: AdminSession) => void;
 }
 
-const AUTHORIZED_ADMIN = 'khankaifcom551@gmail.com';
-
 export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const [email, setEmail] = useState('');
   const [step, setStep] = useState<'email' | 'code'>('email');
@@ -29,8 +27,8 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({ isOpen, onClos
     setMessage(null);
 
     const cleanEmail = email.trim().toLowerCase();
-    if (cleanEmail !== AUTHORIZED_ADMIN.toLowerCase()) {
-      setError(`Access Restricted: Only the authorized administrator (${AUTHORIZED_ADMIN}) has access to the Admin Panel.`);
+    if (!cleanEmail) {
+      setError('Please enter your administrator email address.');
       return;
     }
 
@@ -47,10 +45,10 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({ isOpen, onClos
         setMessage(res.data.message);
         if (res.data.code) {
           setGeneratedHintCode(res.data.code);
-          setSecretCode(res.data.code); // Pre-fill for administrator convenience
+          setSecretCode(res.data.code);
         }
       } else {
-        setError(res.error || 'Failed to request secret verification code.');
+        setError(res.error || 'Access Denied: Entered email is not recognized as an authorized system administrator.');
       }
     } catch {
       setError('Network error while requesting verification code.');
@@ -158,7 +156,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({ isOpen, onClos
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter administrator email (e.g. khankaifcom551@gmail.com)"
+                  placeholder="Enter your administrator email address"
                   required
                   autoFocus
                   className="w-full rounded-xl border border-neutral-300 bg-neutral-50 px-3.5 py-2.5 pl-10 text-xs text-neutral-900 placeholder-neutral-400 focus:border-neutral-900 focus:bg-white focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-white dark:placeholder-neutral-500 dark:focus:border-white"
@@ -166,19 +164,8 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({ isOpen, onClos
                 <Mail className="absolute left-3.5 top-3 h-4 w-4 text-neutral-400" />
               </div>
               <p className="mt-1.5 text-[11px] text-neutral-500 dark:text-neutral-400">
-                Only <strong className="text-neutral-800 dark:text-neutral-200 font-mono">khankaifcom551@gmail.com</strong> can unlock full administrator access.
+                Only the designated system administrator can unlock full administrative controls.
               </p>
-            </div>
-
-            {/* Quick 1-click test button for Kaif Khan */}
-            <div className="pt-1">
-              <button
-                type="button"
-                onClick={() => setEmail(AUTHORIZED_ADMIN)}
-                className="text-[11px] font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 underline underline-offset-2"
-              >
-                Auto-fill administrator email ({AUTHORIZED_ADMIN})
-              </button>
             </div>
 
             <button

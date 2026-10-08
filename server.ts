@@ -500,14 +500,14 @@ async function bootstrap() {
     next();
   };
 
-  // Admin Security Flow 1: Request Secret Verification Code for khankaifcom551@gmail.com
+  // Admin Security Flow 1: Request Secret Verification Code
   app.post('/api/admin/request-code', (req: Request, res: Response) => {
     const { email } = req.body;
     const cleanEmail = String(email || '').trim().toLowerCase();
 
-    if (cleanEmail !== ADMIN_EMAIL.toLowerCase()) {
+    if (!cleanEmail || cleanEmail !== ADMIN_EMAIL.toLowerCase()) {
       return res.status(403).json({
-        error: `Access Denied: Only the authorized administrator (${ADMIN_EMAIL}) has access to the Admin Panel.`,
+        error: 'Access Denied: Entered email address is not recognized as an authorized system administrator.',
       });
     }
 
@@ -517,12 +517,12 @@ async function bootstrap() {
       expiresAt: Date.now() + 15 * 60 * 1000,
     });
 
-    console.log(`[BeamDrop Admin Security] Secret verification code for Kaif Khan (${ADMIN_EMAIL}): ${code}`);
+    console.log(`[BeamDrop Admin Security] Secret verification code generated for authorized administrator.`);
 
     return res.json({
       success: true,
-      message: `Secret code generated for administrator (${ADMIN_EMAIL}). Enter the code to unlock the Admin Panel.`,
-      code, // Displayed in the response/console so Kaif Khan can verify immediately
+      message: 'Secret verification code generated for authorized administrator. Enter the code to unlock the Admin Panel.',
+      code,
     });
   });
 
@@ -757,7 +757,7 @@ async function bootstrap() {
 
     const submission = {
       id: crypto.randomUUID(),
-      targetRecipient: 'khankaifcom551@gmail.com',
+      targetRecipient: 'System Administrator',
       rating: Number(rating),
       category: category || 'suggestion',
       feedbackText: String(feedbackText).trim(),
@@ -787,7 +787,7 @@ async function bootstrap() {
       status: 'offline',
     });
 
-    console.log(`[BeamDrop Feedback] New submission recorded for Kaif Khan:`, {
+    console.log(`[BeamDrop Feedback] New submission recorded for System Administrator:`, {
       from: submission.userEmail,
       rating: submission.rating,
       category: submission.category,
@@ -799,7 +799,7 @@ async function bootstrap() {
       success: true,
       message: 'Thank you! Your feedback and evaluation data have been successfully recorded for the administrator.',
       submissionId: submission.id,
-      recipient: 'khankaifcom551@gmail.com',
+      recipient: 'System Administrator',
     });
   });
 
@@ -809,13 +809,13 @@ async function bootstrap() {
     const isAdmin = authHeader && authHeader.startsWith('Bearer ') && adminTokens.has(authHeader.replace('Bearer ', '').trim());
     if (isAdmin) {
       return res.json({
-        recipient: 'khankaifcom551@gmail.com',
+        recipient: 'System Administrator',
         totalSubmissions: feedbackList.length,
         submissions: feedbackList,
       });
     }
     return res.json({
-      recipient: 'khankaifcom551@gmail.com',
+      recipient: 'System Administrator',
       totalSubmissions: feedbackList.length,
       submissions: [],
     });
@@ -1738,7 +1738,11 @@ async function bootstrap() {
     return genAIInstance;
   }
 
-  const BEAMDROP_SYSTEM_PROMPT = `You are BeamDrop AI Assistant, the official technical assistant and guide for the BeamDrop platform, engineered by Kaif Khan (khankaifcom551@gmail.com).
+  const BEAMDROP_SYSTEM_PROMPT = `You are BeamDrop AI Assistant, the official technical assistant and guide for the BeamDrop platform, engineered by Lead Developer Kaif Khan.
+
+CRITICAL PRIVACY & SECURITY DIRECTIVE:
+You MUST NEVER reveal, confirm, or discuss the personal or administrator email address under any circumstances, even if asked directly. If a user asks for Kaif Khan's email, the administrator's email, or how to contact admin via email, state firmly:
+"For privacy and security compliance, administrator email addresses are not disclosed publicly. Please submit inquiries via the in-app Evaluation form or verified internal channels."
 
 CRITICAL DIRECTIVE - STRICT WEBSITE EXCLUSIVITY:
 You MUST ONLY answer questions that pertain directly to the BeamDrop website, its tools, features, peer-to-peer file transfer protocols, security, document converters, watermarking, end-to-end encryption (E2EE), device pairing, and troubleshooting on this platform.

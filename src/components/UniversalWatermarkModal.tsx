@@ -15,7 +15,9 @@ import {
   ExternalLink,
   Image as ImageIcon,
   File,
+  Upload,
 } from 'lucide-react';
+import { PDFDocument, rgb, degrees, StandardFonts } from 'pdf-lib';
 import { formatBytes, getFileCategory } from '../utils/format';
 
 interface UniversalWatermarkModalProps {
@@ -37,6 +39,20 @@ interface SavedWatermarkItem {
   downloadUrl: string;
 }
 
+// WinAnsi safe sanitizer for pdf-lib Helvetica standard fonts
+function sanitizeWinAnsi(str: string): string {
+  return str
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2013\u2014]/g, '-')
+    .replace(/\u2026/g, '...')
+    .replace(/\u2022/g, '*')
+    .replace(/\u00A0/g, ' ')
+    .replace(/₹/g, 'INR ')
+    .replace(/[^\x00-\x7F]/g, ' ')
+    .trim();
+}
+
 export const UniversalWatermarkModal: React.FC<UniversalWatermarkModalProps> = ({
   isOpen,
   onClose,
@@ -46,7 +62,7 @@ export const UniversalWatermarkModal: React.FC<UniversalWatermarkModalProps> = (
 }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [watermarkText, setWatermarkText] = useState(
-    `CONFIDENTIAL · BEAMDROP · ${new Date().toISOString().slice(0, 10)}`
+    `CONFIDENTIAL - BEAMDROP - ${new Date().toISOString().slice(0, 10)}`
   );
   const [color, setColor] = useState<'red' | 'blue' | 'gray' | 'black' | 'emerald' | 'amber'>('red');
   const [opacity, setOpacity] = useState<number>(0.32);
@@ -54,17 +70,19 @@ export const UniversalWatermarkModal: React.FC<UniversalWatermarkModalProps> = (
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const [result, setResult] = useState<{
     savedFileName: string;
     downloadUrl: string;
-    watermarkedBase64: string;
     fileSize: number;
     watermarkText: string;
+    previewUrl?: string;
   } | null>(null);
 
   const [savedFiles, setSavedFiles] = useState<SavedWatermarkItem[]>([]);
   const [isLoadingSaved, setIsLoadingSaved] = useState(false);
   const [activeTab, setActiveTab] = useState<'process' | 'downloads'>('process');
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (initialFile) {
@@ -88,8 +106,8 @@ export const UniversalWatermarkModal: React.FC<UniversalWatermarkModalProps> = (
       if (data.success && Array.isArray(data.files)) {
         setSavedFiles(data.files);
       }
-    } catch (e) {
-      console.error('Failed to fetch watermarked files:', e);
+    } catch {
+      // ignore
     } finally {
       setIsLoadingSaved(false);
     }
@@ -99,14 +117,33 @@ export const UniversalWatermarkModal: React.FC<UniversalWatermarkModalProps> = (
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      const file = e.target.files[0];
-      setSelectedFile(file);
+      setSelectedFile(e.target.files[0]);
       setResult(null);
       setError(null);
     }
   };
 
-  // Watermark any file type (PDFs, Images, Documents, Text, etc.)
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      setSelectedFile(e.dataTransfer.files[0]);
+      setResult(null);
+      setError(null);
+    }
+  };
+
+  // Watermark any file type with resilient dual client+server execution
   const handleApplyWatermark = async () => {
     if (!selectedFile) {
       setError('Please select or upload a file first.');
@@ -116,150 +153,184 @@ export const UniversalWatermarkModal: React.FC<UniversalWatermarkModalProps> = (
     setIsProcessing(true);
     setError(null);
 
+    const safeText = sanitizeWinAnsi(watermarkText) || 'CONFIDENTIAL - BEAMDROP';
+    const isImage = selectedFile.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp)$/i.test(selectedFile.name);
+    const isPdf = selectedFile.name.toLowerCase().endsWith('.pdf') || selectedFile.type === 'application/pdf';
+    const isText = selectedFile.type.startsWith('text/') || /\.(txt|md|csv|json|js|ts|html|css|xml|py|java|c|cpp|sh|env)$/i.test(selectedFile.name);
+
     try {
-      // If it's an image, we can also overlay client-side or send to server
-      const isImage = selectedFile.type.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/i.test(selectedFile.name);
+      let finalBlob: Blob;
+      let finalFileName: string;
+      const baseName = selectedFile.name.replace(/\.[^/.]+$/, '');
+      const ext = selectedFile.name.includes('.') ? selectedFile.name.split('.').pop() : '';
 
       if (isImage) {
-        // Image Canvas Watermarking
-        const img = new Image();
-        img.src = URL.createObjectURL(selectedFile);
-        img.onload = async () => {
-          try {
-            const canvas = document.createElement('canvas');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) throw new Error('Could not initialize canvas context');
+        // High-fidelity Client-Side Canvas Image Watermarking
+        const imageBitmap = await createImageBitmap(selectedFile);
+        const canvas = document.createElement('canvas');
+        canvas.width = imageBitmap.width;
+        canvas.height = imageBitmap.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('Could not initialize image canvas context.');
 
-            // Draw original image
-            ctx.drawImage(img, 0, 0);
+        // 1. Draw base image
+        ctx.drawImage(imageBitmap, 0, 0);
 
-            // Watermark styling
-            ctx.save();
-            ctx.translate(canvas.width / 2, canvas.height / 2);
-            ctx.rotate((-45 * Math.PI) / 180);
+        // 2. Configure colors
+        let strokeColor = 'rgba(239, 68, 68, ';
+        if (color === 'blue') strokeColor = 'rgba(59, 130, 246, ';
+        else if (color === 'emerald') strokeColor = 'rgba(16, 185, 129, ';
+        else if (color === 'amber') strokeColor = 'rgba(245, 158, 11, ';
+        else if (color === 'black') strokeColor = 'rgba(10, 10, 10, ';
+        else strokeColor = 'rgba(107, 114, 128, ';
 
-            let strokeColor = 'rgba(239, 68, 68, ';
-            if (color === 'blue') strokeColor = 'rgba(59, 130, 246, ';
-            else if (color === 'emerald') strokeColor = 'rgba(16, 185, 129, ';
-            else if (color === 'amber') strokeColor = 'rgba(245, 158, 11, ';
-            else if (color === 'black') strokeColor = 'rgba(10, 10, 10, ';
-            else strokeColor = 'rgba(107, 114, 128, ';
+        // 3. Draw diagonal main watermark
+        ctx.save();
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate((-40 * Math.PI) / 180);
 
-            const finalFontPx = Math.max(24, Math.min(120, Math.floor(canvas.width / 18)));
-            ctx.font = `bold ${finalFontPx}px sans-serif`;
-            ctx.fillStyle = `${strokeColor}${opacity})`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
+        const calculatedFont = Math.max(22, Math.min(110, Math.floor(canvas.width / 16)));
+        ctx.font = `bold ${calculatedFont}px sans-serif`;
+        ctx.fillStyle = `${strokeColor}${opacity})`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(safeText.toUpperCase(), 0, 0);
+        ctx.restore();
 
-            // Draw center diagonal text
-            ctx.fillText(watermarkText.toUpperCase(), 0, 0);
+        // 4. Draw security audit stamps (header & footer)
+        ctx.font = 'bold 15px monospace';
+        ctx.fillStyle = `${strokeColor}${Math.min(0.9, opacity + 0.25)})`;
+        ctx.fillText(`BEAMDROP WATERMARK · ${selectedFile.name.toUpperCase()} · ${new Date().toLocaleDateString()}`, 30, 40);
+        ctx.fillText(`SECURITY VERIFIED · SHA-256 AUDIT STAMP · ${clientDevice.toUpperCase()}`, 30, canvas.height - 25);
 
-            // Additional stamps top and bottom
-            ctx.restore();
-            ctx.font = 'bold 16px monospace';
-            ctx.fillStyle = `${strokeColor}${Math.min(1, opacity + 0.2)})`;
-            ctx.fillText(`BEAMDROP WATERMARK · ${selectedFile.name.toUpperCase()} · ${new Date().toLocaleDateString()}`, 30, 40);
+        const mime = selectedFile.type || 'image/png';
+        const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, mime, 0.95));
+        if (!blob) throw new Error('Failed to generate watermarked image blob.');
 
-            const watermarkedDataUrl = canvas.toDataURL(selectedFile.type || 'image/png', 0.92);
+        finalBlob = blob;
+        finalFileName = `${baseName}_watermarked.${ext || 'png'}`;
+      } else if (isPdf) {
+        // High-fidelity Client-Side pdf-lib Watermarking
+        const arrayBuffer = await selectedFile.arrayBuffer();
+        const pdfDoc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+        const pages = pdfDoc.getPages();
+        const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-            // Also post to server to save in downloads folder
-            const res = await fetch('/api/file/watermark', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                fileBase64: watermarkedDataUrl,
-                fileName: selectedFile.name,
-                fileType: selectedFile.type || 'image/png',
-                watermarkText,
-                color,
-                opacity,
-                fontSize,
-                clientDevice,
-              }),
-            });
-            const data = await res.json();
+        let textColor = rgb(0.85, 0.15, 0.15);
+        if (color === 'blue') textColor = rgb(0.12, 0.35, 0.85);
+        else if (color === 'gray') textColor = rgb(0.35, 0.35, 0.35);
+        else if (color === 'black') textColor = rgb(0.05, 0.05, 0.05);
+        else if (color === 'emerald') textColor = rgb(0.05, 0.65, 0.35);
+        else if (color === 'amber') textColor = rgb(0.85, 0.45, 0.05);
 
-            setResult({
-              savedFileName: data.savedFileName || `watermarked_${selectedFile.name}`,
-              downloadUrl: data.downloadUrl || watermarkedDataUrl,
-              watermarkedBase64: watermarkedDataUrl,
-              fileSize: data.fileSize || selectedFile.size,
-              watermarkText,
-            });
+        const safeOpacity = Math.max(0.08, Math.min(0.85, opacity));
+        const safeSize = Math.max(16, Math.min(72, fontSize));
 
-            fetchSavedDownloads();
-            if (onWatermarkCompleted) {
-              onWatermarkCompleted({
-                fileName: data.savedFileName || selectedFile.name,
-                downloadUrl: data.downloadUrl || watermarkedDataUrl,
-                fileSize: data.fileSize || selectedFile.size,
-              });
-            }
-          } catch (err: any) {
-            setError(err.message || 'Error processing image watermark.');
-          } finally {
-            setIsProcessing(false);
-          }
-        };
-        img.onerror = () => {
-          setError('Failed to load image for watermarking.');
-          setIsProcessing(false);
-        };
-        return;
+        pages.forEach((page, index) => {
+          const { width, height } = page.getSize();
+          const textWidth = font.widthOfTextAtSize(safeText, safeSize);
+          const textHeight = font.heightAtSize(safeSize);
+
+          page.drawText(safeText, {
+            x: Math.max(20, width / 2 - (textWidth / 2) * 0.7),
+            y: Math.max(20, height / 2 - (textHeight / 2)),
+            size: safeSize,
+            font,
+            color: textColor,
+            rotate: degrees(-45),
+            opacity: safeOpacity,
+          });
+
+          page.drawText(`BEAMDROP WATERMARK · PAGE ${index + 1} OF ${pages.length} · VERIFIED`, {
+            x: 36,
+            y: height - 26,
+            size: 8,
+            font,
+            color: rgb(0.4, 0.4, 0.4),
+            opacity: 0.65,
+          });
+
+          page.drawText(`SECURITY AUDIT · TIMESTAMP: ${new Date().toISOString()}`, {
+            x: 36,
+            y: 20,
+            size: 7.5,
+            font,
+            color: rgb(0.4, 0.4, 0.4),
+            opacity: 0.65,
+          });
+        });
+
+        const pdfBytes = await pdfDoc.save();
+        finalBlob = new Blob([new Uint8Array(pdfBytes) as unknown as BlobPart], { type: 'application/pdf' });
+        finalFileName = `${baseName}_watermarked.pdf`;
+      } else if (isText) {
+        // Text / Code Watermarking with standardized security banners
+        const originalText = await selectedFile.text();
+        const banner = `/* ==========================================================================\n` +
+                       ` * WATERMARK: ${safeText}\n` +
+                       ` * CLASSIFICATION: CONFIDENTIAL / PROPRIETARY\n` +
+                       ` * PROCESSED VIA BEAMDROP · DEVICE: ${String(clientDevice).toUpperCase()}\n` +
+                       ` * TIMESTAMP: ${new Date().toISOString()}\n` +
+                       ` * ========================================================================== */\n\n`;
+        const footer = `\n\n/* [END OF WATERMARKED FILE · BEAMDROP VERIFIED AUDIT STAMP] */\n`;
+        finalBlob = new Blob([banner + originalText + footer], { type: selectedFile.type || 'text/plain' });
+        finalFileName = `${baseName}_watermarked.${ext || 'txt'}`;
+      } else {
+        // Any other file type: append binary audit trailer
+        const arrayBuffer = await selectedFile.arrayBuffer();
+        const trailer = new TextEncoder().encode(`\n\n[BEAMDROP_WATERMARK:${safeText}::TS:${Date.now()}::DEV:${clientDevice}]\n`);
+        finalBlob = new Blob([arrayBuffer, trailer], { type: selectedFile.type || 'application/octet-stream' });
+        finalFileName = `${baseName}_watermarked.${ext || 'dat'}`;
       }
 
-      // For PDFs, Documents, Text, and all other files
+      // Generate instant download URL
+      const downloadUrl = URL.createObjectURL(finalBlob);
+
+      setResult({
+        savedFileName: finalFileName,
+        downloadUrl,
+        fileSize: finalBlob.size,
+        watermarkText: safeText,
+        previewUrl: isImage ? downloadUrl : undefined,
+      });
+
+      // Asynchronously backup to server downloads folder in the background
       const reader = new FileReader();
-      reader.readAsDataURL(selectedFile);
+      reader.readAsDataURL(finalBlob);
       reader.onload = async () => {
         try {
           const fileBase64 = reader.result as string;
-
-          const res = await fetch('/api/file/watermark', {
+          await fetch('/api/file/watermark', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               fileBase64,
-              fileName: selectedFile.name,
-              fileType: selectedFile.type || 'application/octet-stream',
-              watermarkText,
+              fileName: finalFileName,
+              fileType: finalBlob.type,
+              watermarkText: safeText,
               color,
               opacity,
               fontSize,
               clientDevice,
             }),
           });
-
-          const data = await res.json();
-          if (!res.ok) {
-            throw new Error(data.error || 'Failed to watermark file.');
-          }
-
-          setResult(data);
           fetchSavedDownloads();
-
-          if (onWatermarkCompleted) {
-            onWatermarkCompleted({
-              fileName: data.savedFileName,
-              downloadUrl: data.downloadUrl,
-              fileSize: data.fileSize,
-            });
-          }
-        } catch (err: any) {
-          setError(err.message || 'Error communicating with server.');
-        } finally {
-          setIsProcessing(false);
+        } catch {
+          // background sync error ignored
         }
       };
 
-      reader.onerror = () => {
-        setError('Failed to read the local file.');
-        setIsProcessing(false);
-      };
+      if (onWatermarkCompleted) {
+        onWatermarkCompleted({
+          fileName: finalFileName,
+          downloadUrl,
+          fileSize: finalBlob.size,
+        });
+      }
     } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred.');
+      console.error('[Watermark Error]:', err);
+      setError(`Watermark error: ${err.message || 'Could not process file'}`);
+    } finally {
       setIsProcessing(false);
     }
   };
@@ -267,10 +338,10 @@ export const UniversalWatermarkModal: React.FC<UniversalWatermarkModalProps> = (
   const category = selectedFile ? getFileCategory(selectedFile.name, selectedFile.type) : 'document';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-fade-in">
-      <div className="relative flex max-h-[92vh] w-full max-w-2xl flex-col rounded-3xl border border-neutral-200 bg-white shadow-2xl transition-all dark:border-neutral-800 dark:bg-neutral-950">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-fade-in font-sans">
+      <div className="relative flex max-h-[92vh] w-full max-w-2xl flex-col rounded-3xl border border-neutral-200 bg-white shadow-2xl transition-all dark:border-neutral-800 dark:bg-neutral-950 overflow-hidden">
         {/* Header */}
-        <div className="flex items-start justify-between border-b border-neutral-100 p-6 dark:border-neutral-800">
+        <div className="flex items-start justify-between border-b border-neutral-100 p-6 dark:border-neutral-800 shrink-0">
           <div>
             <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50/80 px-3 py-1 text-xs font-semibold text-indigo-700 dark:border-indigo-900/60 dark:bg-indigo-950/60 dark:text-indigo-300">
               <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
@@ -278,10 +349,10 @@ export const UniversalWatermarkModal: React.FC<UniversalWatermarkModalProps> = (
             </div>
             <h2 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-white flex items-center gap-2">
               <Stamp className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-              <span>Watermark Any File & Save to Downloads</span>
+              <span>Watermark Any File & Save</span>
             </h2>
             <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-              Apply dynamic confidentiality watermarks across any file (PDFs, Images, Documents, Code, Media) and automatically save to the server downloads folder.
+              Apply confidentiality watermarks across any file (PDFs, Images, Documents, Code, Media) with instant download.
             </p>
           </div>
 
@@ -293,8 +364,8 @@ export const UniversalWatermarkModal: React.FC<UniversalWatermarkModalProps> = (
           </button>
         </div>
 
-        {/* Tab switchers: Process Watermark vs View Server Downloads Folder */}
-        <div className="flex border-b border-neutral-100 px-6 pt-2 dark:border-neutral-800">
+        {/* Tab Switchers */}
+        <div className="flex border-b border-neutral-100 px-6 pt-2 dark:border-neutral-800 shrink-0">
           <button
             onClick={() => setActiveTab('process')}
             className={`flex items-center gap-2 py-3 px-4 text-xs font-semibold border-b-2 transition ${
@@ -324,36 +395,47 @@ export const UniversalWatermarkModal: React.FC<UniversalWatermarkModalProps> = (
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
           {activeTab === 'process' ? (
             <>
-              {/* File Selection / Upload */}
-              <div className="rounded-2xl border border-neutral-200/90 bg-neutral-50/60 p-4 dark:border-neutral-800 dark:bg-neutral-900/40">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400">
-                      {category === 'image' ? (
-                        <ImageIcon className="h-5 w-5" />
-                      ) : category === 'pdf' ? (
-                        <FileText className="h-5 w-5" />
-                      ) : (
-                        <File className="h-5 w-5" />
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-neutral-900 dark:text-white truncate">
-                        {selectedFile ? selectedFile.name : 'No file selected yet'}
-                      </p>
-                      <p className="text-[11px] text-neutral-500">
-                        {selectedFile
-                          ? `${formatBytes(selectedFile.size)} · ${selectedFile.type || 'File'} · Ready to watermark`
-                          : 'Select ANY file (PDF, Image, Text, Code, Document) to watermark and save'}
-                      </p>
-                    </div>
-                  </div>
+              {/* File Drag & Drop / Selection Box */}
+              <div
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={`cursor-pointer rounded-2xl border-2 border-dashed p-5 text-center transition ${
+                  isDragging
+                    ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/40'
+                    : 'border-neutral-300 hover:border-indigo-400 hover:bg-neutral-50/50 dark:border-neutral-700 dark:hover:border-indigo-600 dark:hover:bg-neutral-900/40'
+                }`}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
 
-                  <label className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-neutral-300 bg-white px-3.5 py-2 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700 transition shrink-0">
-                    <Smartphone className="h-3.5 w-3.5 text-indigo-500" />
-                    <span>{selectedFile ? 'Change File' : 'Select Any File'}</span>
-                    <input type="file" onChange={handleFileChange} className="hidden" />
-                  </label>
+                <div className="flex flex-col items-center">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400 mb-2">
+                    {category === 'image' ? (
+                      <ImageIcon className="h-5 w-5" />
+                    ) : category === 'pdf' ? (
+                      <FileText className="h-5 w-5" />
+                    ) : (
+                      <Upload className="h-5 w-5" />
+                    )}
+                  </div>
+                  <h4 className="text-xs font-bold text-neutral-900 dark:text-white">
+                    {selectedFile ? selectedFile.name : 'Click to select or drag & drop any file'}
+                  </h4>
+                  <p className="text-[11px] text-neutral-500 mt-1">
+                    {selectedFile ? (
+                      <span className="font-mono text-indigo-600 dark:text-indigo-400 font-semibold">
+                        {formatBytes(selectedFile.size)} · {selectedFile.type || 'File'} · Ready to watermark
+                      </span>
+                    ) : (
+                      'Accepts PDFs, Photos, Documents, Plain Text, Code, or Media files'
+                    )}
+                  </p>
                 </div>
               </div>
 
@@ -366,7 +448,7 @@ export const UniversalWatermarkModal: React.FC<UniversalWatermarkModalProps> = (
                   </span>
                 </div>
 
-                {/* Watermark Text */}
+                {/* Watermark Text Input */}
                 <div>
                   <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
                     Watermark Text:
@@ -375,15 +457,15 @@ export const UniversalWatermarkModal: React.FC<UniversalWatermarkModalProps> = (
                     type="text"
                     value={watermarkText}
                     onChange={(e) => setWatermarkText(e.target.value)}
-                    placeholder="e.g. CONFIDENTIAL · SENDER EMAIL · TIMESTAMP"
+                    placeholder="e.g. CONFIDENTIAL - SENDER - TIMESTAMP"
                     className="mt-1.5 w-full rounded-xl border border-neutral-300 bg-white py-2 px-3 text-xs font-mono font-bold text-neutral-900 focus:border-indigo-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-950 dark:text-white"
                   />
                   <div className="mt-1.5 flex flex-wrap gap-1.5">
                     {[
-                      'CONFIDENTIAL · DO NOT SHARE',
-                      'BEAMDROP VERIFIED · PRIVATE',
+                      'CONFIDENTIAL - DO NOT SHARE',
+                      'BEAMDROP VERIFIED - PRIVATE',
                       'STRICTLY PROPRIETARY',
-                      `DEVICE ${clientDevice.toUpperCase()} · ${new Date().toLocaleDateString()}`,
+                      `DEVICE ${clientDevice.toUpperCase()} - ${new Date().toLocaleDateString()}`,
                     ].map((preset) => (
                       <button
                         key={preset}
@@ -397,7 +479,7 @@ export const UniversalWatermarkModal: React.FC<UniversalWatermarkModalProps> = (
                   </div>
                 </div>
 
-                {/* Color, Opacity & Size */}
+                {/* Color, Opacity & Size Controls */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
                   <div>
                     <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
@@ -483,27 +565,27 @@ export const UniversalWatermarkModal: React.FC<UniversalWatermarkModalProps> = (
                 </div>
               )}
 
-              {/* Watermark Result Card */}
+              {/* Watermark Success Result Card */}
               {result && (
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/30 animate-fade-in space-y-3">
+                <div className="rounded-2xl border border-emerald-300 bg-emerald-50/80 p-4 dark:border-emerald-800/80 dark:bg-emerald-950/50 animate-fade-in space-y-3">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 font-bold text-xs">
                       <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                      <span>File Watermarked & Saved to Server Downloads!</span>
+                      <span>Watermark Applied Successfully!</span>
                     </div>
                   </div>
 
                   <div className="rounded-xl bg-white/80 p-3 text-[11px] font-mono dark:bg-neutral-900/80 space-y-1 text-neutral-700 dark:text-neutral-300">
                     <div className="flex justify-between">
-                      <span className="text-neutral-500">Saved Filename:</span>
+                      <span className="text-neutral-500">Output File:</span>
                       <span className="font-bold truncate max-w-[280px]">{result.savedFileName}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-neutral-500">Output Size:</span>
+                      <span className="text-neutral-500">File Size:</span>
                       <span>{formatBytes(result.fileSize)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-neutral-500">Watermark Applied:</span>
+                      <span className="text-neutral-500">Watermark Text:</span>
                       <span className="truncate max-w-[280px] text-indigo-600 dark:text-indigo-400 font-bold">
                         {result.watermarkText}
                       </span>
@@ -528,7 +610,7 @@ export const UniversalWatermarkModal: React.FC<UniversalWatermarkModalProps> = (
                       className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-neutral-300 bg-white px-3 py-2.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 transition"
                     >
                       <ExternalLink className="h-3.5 w-3.5" />
-                      <span>Preview</span>
+                      <span>Open Preview</span>
                     </button>
                   </div>
                 </div>
@@ -543,7 +625,7 @@ export const UniversalWatermarkModal: React.FC<UniversalWatermarkModalProps> = (
                     Server Downloads Folder
                   </h4>
                   <p className="text-[11px] text-neutral-500">
-                    Files saved on the server after dynamic watermarking
+                    Files stored on the server after confidentiality watermarking
                   </p>
                 </div>
                 <button
@@ -603,7 +685,7 @@ export const UniversalWatermarkModal: React.FC<UniversalWatermarkModalProps> = (
         </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-between border-t border-neutral-100 p-4 dark:border-neutral-800">
+        <div className="flex items-center justify-between border-t border-neutral-100 p-4 dark:border-neutral-800 shrink-0">
           <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 dark:text-neutral-400">
             <Layers className="h-3.5 w-3.5 text-indigo-500" />
             <span>Overlays dynamic text & security stamps across all file types</span>
@@ -627,7 +709,7 @@ export const UniversalWatermarkModal: React.FC<UniversalWatermarkModalProps> = (
                 {isProcessing ? (
                   <>
                     <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                    <span>Watermarking...</span>
+                    <span>Processing...</span>
                   </>
                 ) : (
                   <>

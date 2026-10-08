@@ -233,7 +233,7 @@ export const ForcedFeedbackModal: React.FC<ForcedFeedbackModalProps> = ({
               <span>{isSubmitting ? 'Submitting to Admin Panel...' : 'Submit Feedback & Unlock Transfer'}</span>
             </button>
             <div className="mt-2 flex items-center justify-between text-[11px] text-neutral-400">
-              <span>Admin: <span className="font-mono">khankaifcom551@gmail.com</span></span>
+              <span>System Administrator & Security Review</span>
               <button
                 type="button"
                 onClick={handleDismiss}

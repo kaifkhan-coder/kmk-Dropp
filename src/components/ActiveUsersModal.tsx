@@ -267,7 +267,7 @@ export const ActiveUsersModal: React.FC<ActiveUsersModalProps> = ({
                 Network Privacy & Protection Enabled
               </p>
               <p className="mt-1 text-[11px] text-neutral-500 max-w-sm">
-                Detailed peer identities are hidden in the public dashboard. Full user records, history, and real-time active device tracking are restricted solely to the System Administrator (<span className="font-mono text-indigo-600 dark:text-indigo-400">khankaifcom551@gmail.com</span>).
+                Detailed peer identities are hidden in the public dashboard. Full user records, history, and real-time active device tracking are restricted solely to the authorized System Administrator.
               </p>
             </div>
           ) : (

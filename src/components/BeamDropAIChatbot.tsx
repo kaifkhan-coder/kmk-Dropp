@@ -72,6 +72,36 @@ export const BeamDropAIChatbot: React.FC<BeamDropAIChatbotProps> = ({
     }
   }, [messages, isOpen, isMinimized, isTyping]);
 
+  const getLocalChatReply = (query: string): string => {
+    const q = query.toLowerCase();
+
+    if (q.includes('admin email') || q.includes('kaif email') || (q.includes('email') && (q.includes('admin') || q.includes('contact')))) {
+      return `### Administrator Privacy & Security Notice\n\nFor privacy and security compliance, administrator email addresses are not disclosed publicly.\n\n- **In-App Evaluation**: Please submit comments or inquiries via the in-app **System Evaluation Form** located in the footer.\n- **Admin Controls**: Authorized administrators can log in via the top-bar Admin Portal using their verified credentials.`;
+    }
+
+    if (q.includes('pair') || q.includes('connect') || q.includes('qr') || q.includes('phone') || q.includes('laptop') || q.includes('camera') || q.includes('scan')) {
+      return `### How to Pair Your Devices via QR Scan\n\n1. **Display QR**: Open BeamDrop on your desktop or laptop screen to view the live dynamic pairing QR code.\n2. **Scan Screen**: Tap **Launch Camera Scan** on your mobile phone or tablet to scan the screen.\n3. **Direct P2P Link**: A secure WebRTC DataChannel connection is established instantly without typing room codes.\n4. **Set Device Name**: Give your device an identifiable name (e.g. "Kaif's iPhone") so peers recognize you immediately.\n5. **Beam Files**: Select any file and watch live throughput metrics on the Recharts speed chart!`;
+    }
+
+    if (q.includes('watermark') || q.includes('protect') || q.includes('stamp')) {
+      return `### Universal Watermarking Studio\n\nProtect confidential files before sending:\n- **Supported Formats**: PDFs, Photos, Documents, Plain Text, Code, and Archives.\n- **Customizable Styling**: Real-time controls for opacity (10% to 75%), font size (20pt to 56pt), and 6 dynamic color themes.\n- **Security Stamps**: Diagonal center watermark plus tamper-evident timestamp and verification headers.\n- **Instant Download**: Direct download in your browser plus automatic backup in the Server Downloads folder.\n\nTap the **Watermarking** button above to launch the studio!`;
+    }
+
+    if (q.includes('convert') || q.includes('format') || q.includes('pdf') || q.includes('word') || q.includes('docx') || q.includes('txt') || q.includes('image')) {
+      return `### Universal Document Converter\n\nFull bi-directional conversion studio:\n- **PDF to Word (.docx)**: Extracts text into editable Word documents formatted in paragraphs.\n- **PDF to Plain Text (.txt)**: Clean text extraction for fast searching and notes.\n- **PDF to Images (.png / .jpg)**: High-resolution rasterization.\n- **Word / Text / Photos to PDF**: Automatically structures notes, Word docs, and photos into standardized A4 PDFs with automated line-wrapping.\n\nTap the **Format Converter** button above to convert files!`;
+    }
+
+    if (q.includes('speed') || q.includes('chart') || q.includes('throughput') || q.includes('mb/s') || q.includes('recharts')) {
+      return `### Real-Time Throughput Monitor\n\n- **Direct WebRTC Speed**: Files transfer directly between devices over local Wi-Fi, reaching high throughput.\n- **Recharts Line Chart**: As files are transferred, TransferProgressView displays a live throughput chart (MB/s), current speed, peak speed, and time remaining.\n- **Offline LAN Fallback**: If external internet drops, BeamDrop switches to local LAN mesh mode so devices on the same Wi-Fi continue transferring uninterrupted.`;
+    }
+
+    if (q.includes('payment') || q.includes('approve') || q.includes('price') || q.includes('e2ee') || q.includes('199') || q.includes('upi') || q.includes('license')) {
+      return `### End-to-End Encryption & Payment Verification\n\n- **Zero-Knowledge AES-256-GCM**: Military-grade client-side encryption.\n- **Lifetime License**: ₹199 configured dynamically by the System Administrator.\n- **Payment Method**: Scan the UPI QR code to submit payment.\n- **Manual Verification**: The system **never auto-approves**. Administrator Kaif Khan manually inspects every receipt screenshot to ensure complete security. Once verified, lifetime access is permanently unlocked!`;
+    }
+
+    return `### BeamDrop AI Assistant\n\nBeamDrop is a zero-cloud P2P file transfer platform built on WebRTC DataChannels:\n- **Instant QR Pairing**: Point camera to pair devices instantly without typing codes.\n- **Format Converter**: Bi-directional conversion between PDF, Word (.docx), Plain Text, and Images.\n- **Universal Watermarking**: Overlays confidentiality text and security stamps on any file.\n- **Zero-Knowledge Encryption**: AES-256-GCM client-side file encryption.\n- **Live Throughput Visualizer**: Recharts line chart showing real-time MB/s.\n\nHow can I help you use BeamDrop today?`;
+  };
+
   const handleSendMessage = async (customText?: string) => {
     const textToSend = (customText || inputMessage).trim();
     if (!textToSend || isTyping) return;
@@ -108,16 +138,17 @@ export const BeamDropAIChatbot: React.FC<BeamDropAIChatbotProps> = ({
       const botMsg: ChatMessage = {
         id: `bot_${Date.now()}`,
         sender: 'bot',
-        text: data.reply || 'I am here to help you with BeamDrop features and tools.',
+        text: data.reply || getLocalChatReply(textToSend),
         timestamp: Date.now(),
       };
 
       setMessages((prev) => [...prev, botMsg]);
     } catch {
+      // Full independent on-device fallback
       const fallbackMsg: ChatMessage = {
         id: `bot_${Date.now()}`,
         sender: 'bot',
-        text: "BeamDrop enables direct P2P transfers via WebRTC. You can scan the QR code to connect devices, convert PDFs to Word/Text/Images with the Format Converter, watermark sensitive files, and unlock lifetime zero-knowledge encryption.",
+        text: getLocalChatReply(textToSend),
         timestamp: Date.now(),
       };
       setMessages((prev) => [...prev, fallbackMsg]);

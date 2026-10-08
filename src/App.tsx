@@ -84,7 +84,7 @@ export default function App() {
   const [isPaid, setIsPaid] = useState<boolean>(false);
   const [paidEmail, setPaidEmail] = useState<string>('');
 
-  // Administrator Session state (Kaif Khan - khankaifcom551@gmail.com)
+  // Administrator Session state (Authorized System Administrator)
   const [adminSession, setAdminSession] = useState<AdminSession | null>(() => {
     try {
       const saved = safeLocalStorage.getItem('beamdrop_admin_session');
@@ -938,7 +938,7 @@ export default function App() {
         myDeviceName={myDevice.name}
       />
 
-      {/* 6. Admin Security Login Modal (Kaif Khan - khankaifcom551@gmail.com) */}
+      {/* 6. Admin Security Login Modal */}
       <AdminLoginModal
         isOpen={isAdminLoginOpen}
         onClose={() => setIsAdminLoginOpen(false)}
@@ -1031,6 +1031,14 @@ export default function App() {
         file={aiAnalyzerTargetFile || selectedFiles[0] || null}
         onApplyRenamedFile={(renamed) => {
           setSelectedFiles((prev) => [renamed, ...prev.slice(1)]);
+        }}
+        onOpenWatermark={(target) => {
+          setWatermarkTargetFile(target);
+          setIsWatermarkModalOpen(true);
+        }}
+        onOpenConverter={(target) => {
+          setConverterTargetFile(target);
+          setIsConverterOpen(true);
         }}
       />
 
