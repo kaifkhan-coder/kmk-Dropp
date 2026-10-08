@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { PDFDocument, rgb, degrees, StandardFonts } from 'pdf-lib';
 import { formatBytes, getFileCategory } from '../utils/format';
+import { safeLoadImageToCanvas } from '../utils/quickActions';
 
 interface UniversalWatermarkModalProps {
   isOpen: boolean;
@@ -166,15 +167,9 @@ export const UniversalWatermarkModal: React.FC<UniversalWatermarkModalProps> = (
 
       if (isImage) {
         // High-fidelity Client-Side Canvas Image Watermarking
-        const imageBitmap = await createImageBitmap(selectedFile);
-        const canvas = document.createElement('canvas');
-        canvas.width = imageBitmap.width;
-        canvas.height = imageBitmap.height;
+        const { canvas } = await safeLoadImageToCanvas(selectedFile);
         const ctx = canvas.getContext('2d');
         if (!ctx) throw new Error('Could not initialize image canvas context.');
-
-        // 1. Draw base image
-        ctx.drawImage(imageBitmap, 0, 0);
 
         // 2. Configure colors
         let strokeColor = 'rgba(239, 68, 68, ';

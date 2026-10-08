@@ -599,8 +599,8 @@ export default function App() {
                   onRequireAuth={() => setIsAuthOpen(true)}
                   isPaid={isPaid}
                   onOpenWatermark={handleOpenWatermarkModal}
-                  onOpenConverter={() => {
-                    setConverterTargetFile(null);
+                  onOpenConverter={(file) => {
+                    setConverterTargetFile(file || null);
                     setIsConverterOpen(true);
                   }}
                   onOpenAIAnalyze={(file) => {

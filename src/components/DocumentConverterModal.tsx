@@ -18,6 +18,7 @@ import {
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import JSZip from 'jszip';
 import { formatBytes } from '../utils/format';
+import { safeLoadImageToCanvas } from '../utils/quickActions';
 
 interface DocumentConverterModalProps {
   isOpen: boolean;
@@ -299,31 +300,13 @@ export const DocumentConverterModal: React.FC<DocumentConverterModalProps> = ({
       const baseName = selectedFile.name.replace(/\.[^/.]+$/, '');
 
       if (isImg) {
-        // Image to PDF via client-side pdf-lib
-        const arrayBuffer = await selectedFile.arrayBuffer();
+        // Image to PDF via client-side pdf-lib with resilient canvas loader
         const pdfDoc = await PDFDocument.create();
-
-        let embeddedImage;
-        const isPng = selectedFile.type === 'image/png' || selectedFile.name.toLowerCase().endsWith('.png');
-
-        if (isPng) {
-          embeddedImage = await pdfDoc.embedPng(arrayBuffer);
-        } else {
-          try {
-            embeddedImage = await pdfDoc.embedJpg(arrayBuffer);
-          } catch {
-            const imgBitmap = await createImageBitmap(selectedFile);
-            const canvas = document.createElement('canvas');
-            canvas.width = imgBitmap.width;
-            canvas.height = imgBitmap.height;
-            const ctx = canvas.getContext('2d');
-            ctx?.drawImage(imgBitmap, 0, 0);
-            const pngBlob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
-            if (!pngBlob) throw new Error('Could not convert image format');
-            const pngBuf = await pngBlob.arrayBuffer();
-            embeddedImage = await pdfDoc.embedPng(pngBuf);
-          }
-        }
+        const { canvas } = await safeLoadImageToCanvas(selectedFile);
+        const pngBlob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+        if (!pngBlob) throw new Error('Could not convert image format');
+        const pngBuf = await pngBlob.arrayBuffer();
+        const embeddedImage = await pdfDoc.embedPng(pngBuf);
 
         const a4W = 595.28;
         const a4H = 841.89;

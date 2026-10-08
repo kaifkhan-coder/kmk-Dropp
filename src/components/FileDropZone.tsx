@@ -1,4 +1,4 @@
-import React, { useRef, useState, useMemo } from 'react';
+import React, { useRef, useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   UploadCloud,
@@ -22,10 +22,16 @@ import {
   ChevronUp,
   Sparkles,
   Layers,
+  Send,
+  Zap,
+  MoreVertical,
+  Loader2,
 } from 'lucide-react';
 import { formatBytes, getFileCategory, FileCategory } from '../utils/format';
 import { TransferHistoryItem, TransferProgress } from '../types';
 import { safeLocalStorage } from '../utils/storage';
+import { FileContextMenu } from './FileContextMenu';
+import { quickWatermarkFile, quickConvertFile } from '../utils/quickActions';
 
 export interface RecentUploadRecord {
   id: string;
@@ -49,7 +55,7 @@ interface FileDropZoneProps {
   onRequireAuth: () => void;
   isPaid?: boolean;
   onOpenWatermark?: (file?: File) => void;
-  onOpenConverter?: () => void;
+  onOpenConverter?: (file?: File) => void;
   onOpenAIAnalyze?: (file?: File) => void;
   history?: TransferHistoryItem[];
   currentTransfer?: TransferProgress | null;
@@ -87,6 +93,38 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [showAllHistory, setShowAllHistory] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Right-click context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    isOpen: boolean;
+    x: number;
+    y: number;
+    file: File | null;
+    index: number | null;
+  }>({
+    isOpen: false,
+    x: 0,
+    y: 0,
+    file: null,
+    index: null,
+  });
+
+  // Action execution toast
+  const [toast, setToast] = useState<{
+    text: string;
+    type: 'success' | 'error' | 'info';
+  } | null>(null);
+
+  const [isProcessingAction, setIsProcessingAction] = useState(false);
+  const [processingActionName, setProcessingActionName] = useState<string | null>(null);
+  const pendingQuickActionRef = useRef<'watermark_and_send' | 'convert_and_send' | null>(null);
+
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 4500);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
 
   // Persistent local recent upload records
   const [localUploads, setLocalUploads] = useState<RecentUploadRecord[]>(() => {
@@ -245,6 +283,129 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
     setIsDragging(false);
   };
 
+  const handleWatermarkAndSend = async (file: File, index?: number | null) => {
+    if (!isSignedIn) {
+      onRequireAuth();
+      return;
+    }
+
+    try {
+      setIsProcessingAction(true);
+      setProcessingActionName(`Watermarking "${file.name}"...`);
+
+      const watermarkedFile = await quickWatermarkFile(file);
+
+      // If replacing an existing item in selectedFiles
+      if (typeof index === 'number' && index >= 0 && index < selectedFiles.length) {
+        const updated = [...selectedFiles];
+        updated[index] = watermarkedFile;
+        onClearFiles();
+        onFilesSelected(updated);
+      } else {
+        onFilesSelected([watermarkedFile]);
+      }
+
+      recordUploads([watermarkedFile]);
+
+      setToast({
+        text: `✨ Successfully watermarked "${file.name}"! Starting peer transfer...`,
+        type: 'success',
+      });
+
+      // 1-Click transfer execution
+      setTimeout(() => {
+        onStartTransfer();
+      }, 350);
+    } catch (err: any) {
+      console.error('Quick watermark failed:', err);
+      setToast({
+        text: `Watermarking failed: ${err?.message || 'Could not process file'}`,
+        type: 'error',
+      });
+    } finally {
+      setIsProcessingAction(false);
+      setProcessingActionName(null);
+    }
+  };
+
+  const handleConvertAndSend = async (file: File, index?: number | null) => {
+    if (!isSignedIn) {
+      onRequireAuth();
+      return;
+    }
+
+    try {
+      setIsProcessingAction(true);
+      setProcessingActionName(`Converting "${file.name}"...`);
+
+      const { convertedFile, targetFormatLabel } = await quickConvertFile(file);
+
+      if (typeof index === 'number' && index >= 0 && index < selectedFiles.length) {
+        const updated = [...selectedFiles];
+        updated[index] = convertedFile;
+        onClearFiles();
+        onFilesSelected(updated);
+      } else {
+        onFilesSelected([convertedFile]);
+      }
+
+      recordUploads([convertedFile]);
+
+      setToast({
+        text: `✨ Converted "${file.name}" to ${targetFormatLabel}! Starting peer transfer...`,
+        type: 'success',
+      });
+
+      // 1-Click transfer execution
+      setTimeout(() => {
+        onStartTransfer();
+      }, 350);
+    } catch (err: any) {
+      console.error('Quick convert failed:', err);
+      setToast({
+        text: `Conversion failed: ${err?.message || 'Could not process file'}`,
+        type: 'error',
+      });
+    } finally {
+      setIsProcessingAction(false);
+      setProcessingActionName(null);
+    }
+  };
+
+  const triggerPickAndAction = (action: 'watermark_and_send' | 'convert_and_send') => {
+    if (!isSignedIn) {
+      onRequireAuth();
+      return;
+    }
+    pendingQuickActionRef.current = action;
+    fileInputRef.current?.click();
+  };
+
+  const handleContextMenu = (
+    e: React.MouseEvent,
+    file?: File | null,
+    index?: number | null
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!isSignedIn) {
+      onRequireAuth();
+      return;
+    }
+
+    const targetFile = file || (selectedFiles.length > 0 ? selectedFiles[0] : null);
+    const targetIdx = typeof index === 'number' ? index : (selectedFiles.length > 0 ? 0 : null);
+
+    setContextMenu({
+      isOpen: true,
+      x: e.clientX,
+      y: e.clientY,
+      file: targetFile,
+      index: targetIdx,
+    });
+  };
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -257,6 +418,19 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const filesArray = Array.from(e.dataTransfer.files);
+
+      if (pendingQuickActionRef.current) {
+        const action = pendingQuickActionRef.current;
+        pendingQuickActionRef.current = null;
+        if (action === 'watermark_and_send') {
+          handleWatermarkAndSend(filesArray[0]);
+          return;
+        } else if (action === 'convert_and_send') {
+          handleConvertAndSend(filesArray[0]);
+          return;
+        }
+      }
+
       recordUploads(filesArray);
       onFilesSelected(filesArray);
     }
@@ -269,6 +443,19 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
     }
     if (e.target.files && e.target.files.length > 0) {
       const filesArray = Array.from(e.target.files);
+
+      if (pendingQuickActionRef.current) {
+        const action = pendingQuickActionRef.current;
+        pendingQuickActionRef.current = null;
+        if (action === 'watermark_and_send') {
+          handleWatermarkAndSend(filesArray[0]);
+          return;
+        } else if (action === 'convert_and_send') {
+          handleConvertAndSend(filesArray[0]);
+          return;
+        }
+      }
+
       recordUploads(filesArray);
       onFilesSelected(filesArray);
     }
@@ -305,6 +492,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         onClick={handleZoneClick}
+        onContextMenu={(e) => handleContextMenu(e, selectedFiles[0] || null, selectedFiles.length > 0 ? 0 : null)}
         className={`relative flex min-h-[220px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-6 text-center transition-all ${
           isDragging
             ? 'animate-pulse ring-4 ring-indigo-500/30 border-indigo-600 bg-indigo-50/80 dark:border-indigo-400 dark:bg-indigo-950/70 shadow-2xl shadow-indigo-500/20 scale-[0.995] duration-300'
@@ -343,12 +531,18 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
           Supports every format: PDF, Images (PNG, JPG), Audio, Video, TXT, Word, Code, ZIP, and documents of any size.
         </p>
 
-        <div className="mt-3 flex items-center gap-2 text-[11px] text-neutral-400">
+        <div className="mt-2.5 flex items-center gap-2 text-[11px] text-neutral-400">
           <span>Direct browser-to-device transit</span>
           <span>·</span>
           <span>Zero server storage</span>
           <span>·</span>
           <span>Optional E2EE Encryption</span>
+        </div>
+
+        {/* Right-Click & Quick Actions hint banner */}
+        <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-full border border-indigo-200/70 bg-indigo-50/70 dark:border-indigo-900/40 dark:bg-indigo-950/40 px-3 py-1 text-[11px] font-medium text-indigo-700 dark:text-indigo-300">
+          <Zap className="h-3 w-3 text-indigo-600 dark:text-indigo-400" />
+          <span>Right-click anywhere for 1-click Quick Actions (Watermark & Send, Convert & Send)</span>
         </div>
 
         {!isSignedIn && (
@@ -358,18 +552,65 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
           </div>
         )}
 
-        {/* Feature Tools Buttons: Watermarking & Document Converter */}
+        {/* 1-Click Quick Actions Toolbar Buttons */}
         <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+          {/* Quick Action: Watermark & Send */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (selectedFiles.length > 0) {
+                handleWatermarkAndSend(selectedFiles[0], 0);
+              } else {
+                triggerPickAndAction('watermark_and_send');
+              }
+            }}
+            disabled={isProcessingAction}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-600 bg-indigo-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-indigo-700 active:scale-95 transition disabled:opacity-50"
+            title="Watermark and start transfer in 1 click"
+          >
+            {isProcessingAction && processingActionName?.includes('Watermark') ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Stamp className="h-3.5 w-3.5" />
+            )}
+            <span>Watermark & Send</span>
+          </button>
+
+          {/* Quick Action: Convert & Send */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (selectedFiles.length > 0) {
+                handleConvertAndSend(selectedFiles[0], 0);
+              } else {
+                triggerPickAndAction('convert_and_send');
+              }
+            }}
+            disabled={isProcessingAction}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-600 bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 active:scale-95 transition disabled:opacity-50"
+            title="Convert and start transfer in 1 click"
+          >
+            {isProcessingAction && processingActionName?.includes('Convert') ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <FileText className="h-3.5 w-3.5" />
+            )}
+            <span>Convert & Send</span>
+          </button>
+
           {onOpenWatermark && (
             <div
               onClick={(e) => {
                 e.stopPropagation();
                 onOpenWatermark();
               }}
-              className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50/80 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-900/50 dark:bg-indigo-950/40 dark:text-indigo-300 transition"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50/80 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-900/50 dark:bg-indigo-950/40 dark:text-indigo-300 transition"
+              title="Open full watermarking studio"
             >
               <Stamp className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
-              <span>Watermark Any File & Save</span>
+              <span>Watermark Studio</span>
             </div>
           )}
 
@@ -379,10 +620,11 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
                 e.stopPropagation();
                 onOpenConverter();
               }}
-              className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300 transition"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300 transition"
+              title="Open document converter studio"
             >
-              <FileText className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span>Convert PDF ⇄ Word, Text, Image</span>
+              <Layers className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Convert PDF ⇄ Word</span>
             </div>
           )}
         </div>
@@ -463,6 +705,14 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ type: 'spring', stiffness: 350, damping: 26 }}
+                  onContextMenu={(e) => {
+                    const stagedIndex = selectedFiles.findIndex((f) => f.name === item.name);
+                    if (stagedIndex >= 0) {
+                      handleContextMenu(e, selectedFiles[stagedIndex], stagedIndex);
+                    } else {
+                      handleContextMenu(e, null, null);
+                    }
+                  }}
                   className="flex items-center justify-between py-2.5 px-1 hover:bg-neutral-50/60 dark:hover:bg-neutral-800/40 rounded-xl transition group"
                 >
                   {/* Left: Icon, Name & Size */}
@@ -552,30 +802,75 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
               </div>
             </div>
 
-            {/* Quick Universal Watermark Banner */}
-            {onOpenWatermark && (
-              <div className="mt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 rounded-xl border border-indigo-200 bg-indigo-50/70 p-3 text-xs text-indigo-900 dark:border-indigo-900/60 dark:bg-indigo-950/30 dark:text-indigo-200 animate-fade-in">
-                <div className="flex items-center gap-2">
-                  <Stamp className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                  <span>
-                    <strong>Universal Watermarking:</strong> Apply dynamic confidentiality watermark to any file (PDF, Image, Text, Doc) before sharing.
-                  </span>
+            {/* Quick Actions (1-Click Operations) Bar */}
+            <div className="mt-3 p-3 rounded-xl border border-indigo-200/80 bg-indigo-50/70 dark:border-indigo-900/50 dark:bg-indigo-950/30 flex flex-col md:flex-row md:items-center justify-between gap-2.5 text-xs">
+              <div className="flex items-center gap-2">
+                <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-600 text-white font-bold shadow-xs">
+                  <Zap className="h-3.5 w-3.5" />
                 </div>
+                <div>
+                  <span className="font-bold text-neutral-900 dark:text-white flex items-center gap-1.5">
+                    <span>Quick Actions</span>
+                    <span className="rounded bg-indigo-200 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200 text-[10px] px-1.5 py-0.2">
+                      1-Click
+                    </span>
+                  </span>
+                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                    Apply watermark or conversion and stream directly to peer
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5">
                 <button
                   type="button"
-                  onClick={() => onOpenWatermark(selectedFiles[0])}
-                  className="shrink-0 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 transition"
+                  onClick={() => handleWatermarkAndSend(selectedFiles[0], 0)}
+                  disabled={isProcessingAction}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-indigo-700 active:scale-95 transition disabled:opacity-50"
+                  title="Watermark first queued file and initiate transfer"
                 >
-                  Watermark File
+                  {isProcessingAction && processingActionName?.includes('Watermark') ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Stamp className="h-3 w-3" />
+                  )}
+                  <span>Watermark & Send</span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleConvertAndSend(selectedFiles[0], 0)}
+                  disabled={isProcessingAction}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 active:scale-95 transition disabled:opacity-50"
+                  title="Convert file and initiate transfer"
+                >
+                  {isProcessingAction && processingActionName?.includes('Convert') ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <FileText className="h-3 w-3" />
+                  )}
+                  <span>Convert & Send</span>
+                </button>
+
+                {onOpenAIAnalyze && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenAIAnalyze(selectedFiles[0])}
+                    className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-white dark:bg-neutral-800 px-2.5 py-1.5 text-xs font-semibold text-violet-700 dark:text-violet-300 hover:bg-violet-50 dark:hover:bg-neutral-700 transition"
+                  >
+                    <Sparkles className="h-3 w-3 text-violet-500" />
+                    <span>AI Analyze</span>
+                  </button>
+                )}
               </div>
-            )}
+            </div>
 
             {/* Files List with animated spring layout items */}
             <div className="mt-3 divide-y divide-neutral-100 dark:divide-neutral-800/80 max-h-60 overflow-y-auto pr-1">
               <AnimatePresence>
                 {selectedFiles.map((file, idx) => {
                   const category = getFileCategory(file.name, file.type);
+                  const isPdf = file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf';
 
                   return (
                     <motion.div
@@ -589,39 +884,72 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
                         stiffness: 400,
                         damping: 28,
                       }}
-                      className="flex items-center justify-between py-2.5 group"
+                      onContextMenu={(e) => handleContextMenu(e, file, idx)}
+                      className="flex items-center justify-between py-2.5 group hover:bg-neutral-50/70 dark:hover:bg-neutral-800/40 rounded-xl px-2 transition"
                     >
                       <div className="flex items-center gap-3 min-w-0 pr-3">
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 dark:bg-neutral-800">
                           {renderFileIcon(category)}
                         </div>
                         <div className="truncate">
-                          <p className="truncate text-xs font-medium text-neutral-900 dark:text-white font-mono">
+                          <p className="truncate text-xs font-semibold text-neutral-900 dark:text-white font-mono" title={file.name}>
                             {file.name}
                           </p>
-                          <p className="text-[11px] font-mono text-neutral-500">
+                          <p className="text-[11px] font-mono text-neutral-500 dark:text-neutral-400">
                             {formatBytes(file.size)} · {file.type || 'Binary Document'}
                           </p>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
-                        {/* Watermark button for file */}
-                        {onOpenWatermark && (
-                          <button
-                            type="button"
-                            onClick={() => onOpenWatermark(file)}
-                            title="Watermark this file and save to downloads"
-                            className="flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2 py-1 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-900/60 dark:bg-indigo-950 dark:text-indigo-300 transition"
-                          >
-                            <Stamp className="h-3 w-3" />
-                            <span className="hidden sm:inline">Watermark</span>
-                          </button>
-                        )}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {/* 1-Click Watermark & Send for this specific file */}
+                        <button
+                          type="button"
+                          onClick={() => handleWatermarkAndSend(file, idx)}
+                          disabled={isProcessingAction}
+                          title="Watermark & send this specific file in 1 click"
+                          className="flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50/80 px-2 py-1 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-900/60 dark:bg-indigo-950 dark:text-indigo-300 transition"
+                        >
+                          <Stamp className="h-3 w-3" />
+                          <span className="hidden sm:inline">Watermark & Send</span>
+                        </button>
+
+                        {/* 1-Click Convert & Send for this specific file */}
+                        <button
+                          type="button"
+                          onClick={() => handleConvertAndSend(file, idx)}
+                          disabled={isProcessingAction}
+                          title={`Convert (${isPdf ? 'PDF→Word' : 'to PDF'}) & send in 1 click`}
+                          className="flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50/80 px-2 py-1 text-[11px] font-semibold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950 dark:text-emerald-300 transition"
+                        >
+                          <FileText className="h-3 w-3" />
+                          <span className="hidden sm:inline">Convert & Send</span>
+                        </button>
+
+                        {/* File Action Context Menu Trigger Button */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            setContextMenu({
+                              isOpen: true,
+                              x: rect.right,
+                              y: rect.bottom + 4,
+                              file,
+                              index: idx,
+                            });
+                          }}
+                          className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:bg-neutral-100 hover:text-neutral-900 transition dark:hover:bg-neutral-800 dark:hover:text-white"
+                          title="More quick actions for this file (or right-click)"
+                        >
+                          <MoreVertical className="h-3.5 w-3.5" />
+                        </button>
 
                         <button
                           onClick={() => onRemoveFile(idx)}
                           className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:bg-neutral-100 hover:text-rose-600 transition dark:hover:bg-neutral-800"
+                          title="Remove file from queue"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
@@ -687,6 +1015,71 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
                 </button>
               </div>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Floating Right-Click Context Menu */}
+      <FileContextMenu
+        isOpen={contextMenu.isOpen}
+        position={{ x: contextMenu.x, y: contextMenu.y }}
+        targetFile={contextMenu.file}
+        targetIndex={contextMenu.index}
+        onClose={() => setContextMenu((prev) => ({ ...prev, isOpen: false }))}
+        onWatermarkAndSend={handleWatermarkAndSend}
+        onConvertAndSend={handleConvertAndSend}
+        onSendNow={() => {
+          if (!isSignedIn) {
+            onRequireAuth();
+            return;
+          }
+          onStartTransfer();
+        }}
+        onOpenWatermarkStudio={(file) => {
+          if (onOpenWatermark) onOpenWatermark(file || undefined);
+        }}
+        onOpenConverterStudio={(file) => {
+          if (onOpenConverter) onOpenConverter(file || undefined);
+        }}
+        onOpenAIAnalyze={(file) => {
+          if (onOpenAIAnalyze) onOpenAIAnalyze(file || undefined);
+        }}
+        onRemoveFile={(idx) => {
+          onRemoveFile(idx);
+        }}
+        onBrowseFiles={() => {
+          triggerPickAndAction('watermark_and_send');
+        }}
+        isProcessingAction={isProcessingAction}
+        processingActionName={processingActionName}
+      />
+
+      {/* Action Execution Floating Toast */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 16, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 16, scale: 0.95 }}
+            className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-2xl p-4 shadow-2xl border text-xs font-medium max-w-md backdrop-blur-xl ${
+              toast.type === 'error'
+                ? 'bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-950/90 dark:border-rose-900 dark:text-rose-200 shadow-rose-500/10'
+                : 'bg-emerald-50 border-emerald-200 text-emerald-900 dark:bg-emerald-950/90 dark:border-emerald-900 dark:text-emerald-200 shadow-emerald-500/10'
+            }`}
+          >
+            {toast.type === 'error' ? (
+              <AlertCircle className="h-4 w-4 text-rose-600 dark:text-rose-400 shrink-0" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            )}
+            <span className="flex-1">{toast.text}</span>
+            <button
+              type="button"
+              onClick={() => setToast(null)}
+              className="p-1 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 rounded transition"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
