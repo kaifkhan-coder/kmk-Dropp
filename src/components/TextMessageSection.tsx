@@ -11,7 +11,7 @@ import {
   Sparkles,
   ShieldCheck,
   Share2,
-  Laptop,
+  Shield,
 } from 'lucide-react';
 import { PeerTextMessage, PeerDevice } from '../types';
 
@@ -19,6 +19,7 @@ interface TextMessageSectionProps {
   messages: PeerTextMessage[];
   peers: PeerDevice[];
   onSendMessage: (text: string) => void;
+  onSendStegoText?: (text: string) => void;
   onClearMessages: () => void;
   isSignedIn: boolean;
   onRequireAuth: () => void;
@@ -29,6 +30,7 @@ export const TextMessageSection: React.FC<TextMessageSectionProps> = ({
   messages,
   peers,
   onSendMessage,
+  onSendStegoText,
   onClearMessages,
   isSignedIn,
   onRequireAuth,
@@ -275,17 +277,40 @@ export const TextMessageSection: React.FC<TextMessageSectionProps> = ({
                   : 'Sign in to send text messages to PC'
               }
               disabled={!isSignedIn}
-              className="w-full resize-none rounded-xl border border-neutral-200 bg-white p-3 pr-24 text-xs text-neutral-900 placeholder-neutral-400 outline-none transition focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 disabled:opacity-60 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white dark:focus:border-white dark:focus:ring-white"
+              className="w-full resize-none rounded-xl border border-neutral-200 bg-white p-3 pr-48 text-xs text-neutral-900 placeholder-neutral-400 outline-none transition focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 disabled:opacity-60 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white dark:focus:border-white dark:focus:ring-white"
             />
 
-            <button
-              type="submit"
-              disabled={!isSignedIn || !inputText.trim()}
-              className="absolute right-2 bottom-3 flex items-center gap-1.5 rounded-lg bg-neutral-900 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-neutral-800 disabled:opacity-40 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100 transition"
-            >
-              <Send className="h-3 w-3" />
-              <span>Send</span>
-            </button>
+            <div className="absolute right-2 bottom-2.5 flex items-center gap-1.5">
+              {onSendStegoText && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!isSignedIn) {
+                      onRequireAuth();
+                      return;
+                    }
+                    if (!inputText.trim()) return;
+                    onSendStegoText(inputText);
+                    setInputText('');
+                  }}
+                  disabled={!isSignedIn || !inputText.trim()}
+                  className="flex items-center gap-1 rounded-lg bg-cyan-600 px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-cyan-700 disabled:opacity-40 transition cursor-pointer"
+                  title="Conceal this text inside an innocent carrier image and send as steganography"
+                >
+                  <Shield className="h-3 w-3" />
+                  <span className="hidden sm:inline">Stego Beam</span>
+                </button>
+              )}
+
+              <button
+                type="submit"
+                disabled={!isSignedIn || !inputText.trim()}
+                className="flex items-center gap-1.5 rounded-lg bg-neutral-900 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-neutral-800 disabled:opacity-40 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100 transition"
+              >
+                <Send className="h-3 w-3" />
+                <span>Send</span>
+              </button>
+            </div>
           </div>
         </form>
       </div>

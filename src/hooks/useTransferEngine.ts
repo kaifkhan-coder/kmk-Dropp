@@ -24,6 +24,8 @@ import {
 } from '../utils/crypto';
 import { detectDevice } from '../utils/format';
 import { safeLocalStorage, safeSessionStorage } from '../utils/storage';
+import { isSteganographyImage, decodeDataFromImage } from '../utils/steganography';
+import { soundFx } from '../utils/soundEffects';
 
 const CHUNK_SIZE = 32 * 1024; // 32 KB per chunk (iOS Safari & multi-device buffer safe)
 const ICE_SERVERS: RTCIceServer[] = [
@@ -656,6 +658,44 @@ export function useTransferEngine(initialRoomId?: string, initialKeyBase64?: str
       const verified = meta.checksum ? calculatedChecksum === meta.checksum : true;
       const fileUrl = URL.createObjectURL(fullBlob);
 
+      // Automatic Steganography Detection
+      let isStego = false;
+      let stegoResult: any = undefined;
+      const isCandidateImage =
+        meta.name.toLowerCase().endsWith('.png') ||
+        (meta.type && meta.type.includes('png')) ||
+        meta.name.toLowerCase().includes('stego') ||
+        meta.name.toLowerCase().startsWith('beamdrop');
+
+      if (isCandidateImage) {
+        try {
+          isStego = await isSteganographyImage(fullBlob);
+          if (isStego) {
+            soundFx.playSound('stego_decode');
+            soundFx.triggerHaptic('stego');
+            // Try automatic decoding without password
+            try {
+              const decoded = await decodeDataFromImage(fullBlob);
+              if (decoded) {
+                stegoResult = {
+                  type: decoded.type,
+                  file: decoded.file,
+                  text: decoded.text,
+                  name: decoded.name,
+                  size: decoded.size,
+                  mimeType: decoded.mimeType,
+                  downloadUrl: decoded.file ? URL.createObjectURL(decoded.file) : undefined,
+                };
+              }
+            } catch {
+              // Might be password protected
+            }
+          }
+        } catch {
+          isStego = false;
+        }
+      }
+
       const receivedItem: ReceivedFileItem = {
         id: meta.id,
         name: meta.name,
@@ -667,6 +707,9 @@ export function useTransferEngine(initialRoomId?: string, initialKeyBase64?: str
         verified,
         receivedAt: Date.now(),
         senderDevice: currentTransfer?.peerDeviceName,
+        isStegoCarrier: isStego,
+        stegoDetected: isStego,
+        stegoExtractedResult: stegoResult,
       };
 
       setReceivedFiles((prev) => [receivedItem, ...prev]);
@@ -1637,6 +1680,65 @@ export function useTransferEngine(initialRoomId?: string, initialKeyBase64?: str
     return `${origin}/?room=${cleanRoom}#key=${keyBase64}`;
   }, [roomId, keyBase64]);
 
+  // 12. Convert Received Steganography Carrier to Normal Data
+  const convertReceivedStegoToNormal = useCallback(
+    async (fileId: string, password?: string) => {
+      const target = receivedFiles.find((f) => f.id === fileId);
+      if (!target || !target.blob) {
+        throw new Error('Received carrier file not found');
+      }
+
+      const decoded = await decodeDataFromImage(target.blob, password);
+      soundFx.playSound('stego_decode');
+      soundFx.triggerHaptic('success');
+
+      let downloadUrl: string | undefined = undefined;
+      if (decoded.file) {
+        downloadUrl = URL.createObjectURL(decoded.file);
+      }
+
+      setReceivedFiles((prev) =>
+        prev.map((item) => {
+          if (item.id === fileId) {
+            return {
+              ...item,
+              stegoDetected: true,
+              stegoExtractedResult: {
+                type: decoded.type,
+                file: decoded.file,
+                text: decoded.text,
+                name: decoded.name,
+                size: decoded.size,
+                mimeType: decoded.mimeType,
+                downloadUrl,
+              },
+            };
+          }
+          return item;
+        })
+      );
+
+      // Add decoded normal file into history
+      if (decoded.file) {
+        addToHistory({
+          fileName: `[Decoded Normal Data] ${decoded.name || 'document'}`,
+          fileSize: decoded.size,
+          fileType: decoded.mimeType || 'application/octet-stream',
+          direction: 'received',
+          timestamp: Date.now(),
+          peerName: target.senderDevice || 'Steganography Decryptor',
+          status: 'completed',
+          downloadUrl,
+          isStegoCarrier: true,
+          stegoExtractedName: decoded.name,
+        });
+      }
+
+      return decoded;
+    },
+    [receivedFiles, addToHistory]
+  );
+
   return {
     roomId,
     setRoomId,
@@ -1651,6 +1753,8 @@ export function useTransferEngine(initialRoomId?: string, initialKeyBase64?: str
     localBattery,
     currentTransfer,
     receivedFiles,
+    setReceivedFiles,
+    convertReceivedStegoToNormal,
     history,
     isPaused,
     transferQueue,

@@ -31,6 +31,7 @@ interface TransferProgressViewProps {
   onTogglePause: () => void;
   onCancel: () => void;
   onReset: () => void;
+  onExtractStego?: () => void;
 }
 
 interface ThroughputPoint {
@@ -46,6 +47,7 @@ export const TransferProgressView: React.FC<TransferProgressViewProps> = ({
   onTogglePause,
   onCancel,
   onReset,
+  onExtractStego,
 }) => {
   const isComplete = progress.status === 'completed';
   const isCancelled = progress.status === 'cancelled';
@@ -199,6 +201,35 @@ export const TransferProgressView: React.FC<TransferProgressViewProps> = ({
           />
         </div>
       </div>
+
+      {/* Steganography Conversion Notice & Trigger */}
+      {(progress.fileName.toLowerCase().includes('stego') || progress.fileName.toLowerCase().endsWith('.png')) && isComplete && (
+        <div className="mt-4 rounded-xl border border-cyan-500/30 bg-gradient-to-r from-cyan-500/10 via-indigo-500/10 to-transparent p-3 flex flex-wrap items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-cyan-500/20 text-cyan-600 dark:text-cyan-400">
+              <Shield className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-neutral-900 dark:text-white">
+                Steganography Carrier Transferred
+              </p>
+              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                This image contains concealed data. Convert it back to original normal data anytime.
+              </p>
+            </div>
+          </div>
+          {onExtractStego && (
+            <button
+              type="button"
+              onClick={onExtractStego}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-cyan-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-cyan-500 active:scale-95 transition cursor-pointer"
+            >
+              <Zap className="h-3.5 w-3.5" />
+              <span>Convert to Normal Data</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Real-Time Recharts Throughput Line Chart Section */}
       <div className="mt-5 rounded-2xl border border-neutral-200/80 bg-neutral-50/70 p-4 dark:border-neutral-800/80 dark:bg-neutral-950/40">

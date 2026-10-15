@@ -27,6 +27,8 @@ export interface FileContextMenuProps {
   onSendNow?: (file: File) => void;
   onOpenWatermarkStudio?: (file?: File) => void;
   onOpenConverterStudio?: (file?: File) => void;
+  onOpenSteganographyStudio?: (file?: File) => void;
+  onSteganographyAndSend?: (file: File) => void;
   onOpenAIAnalyze?: (file?: File) => void;
   onRemoveFile?: (index: number) => void;
   onBrowseFiles?: () => void;
@@ -45,6 +47,8 @@ export const FileContextMenu: React.FC<FileContextMenuProps> = ({
   onSendNow,
   onOpenWatermarkStudio,
   onOpenConverterStudio,
+  onOpenSteganographyStudio,
+  onSteganographyAndSend,
   onOpenAIAnalyze,
   onRemoveFile,
   onBrowseFiles,
@@ -216,7 +220,37 @@ export const FileContextMenu: React.FC<FileContextMenuProps> = ({
                 </button>
               )}
 
-              {/* PRIMARY ONE-CLICK ACTION 3: Send Now directly */}
+              {/* PRIMARY ONE-CLICK ACTION 3: Hide in Image (Steganography) */}
+              {targetFile && onSteganographyAndSend && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSteganographyAndSend(targetFile);
+                    onClose();
+                  }}
+                  className="w-full flex items-center justify-between rounded-xl px-2.5 py-2 text-left hover:bg-cyan-50/90 dark:hover:bg-cyan-950/50 text-cyan-800 dark:text-cyan-300 transition group"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-cyan-100 dark:bg-cyan-900/60 text-cyan-600 dark:text-cyan-400 group-hover:scale-105 transition">
+                      <Shield className="h-3.5 w-3.5" />
+                    </div>
+                    <div>
+                      <div className="font-bold flex items-center gap-1.5 text-neutral-900 dark:text-white">
+                        <span>Hide in Image</span>
+                        <span className="rounded bg-cyan-600 text-white text-[9px] px-1 py-0.2 font-mono">
+                          Stego
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-neutral-500 dark:text-neutral-400">
+                        Conceal inside carrier PNG & beam to mobile
+                      </p>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-3.5 w-3.5 opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition" />
+                </button>
+              )}
+
+              {/* PRIMARY ONE-CLICK ACTION 4: Send Now directly */}
               {targetFile && onSendNow && (
                 <button
                   type="button"
@@ -243,6 +277,20 @@ export const FileContextMenu: React.FC<FileContextMenuProps> = ({
               <div className="my-1 border-t border-neutral-100 dark:border-neutral-800/80" />
 
               {/* SECONDARY STUDIO TOOLS */}
+              {onOpenSteganographyStudio && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onOpenSteganographyStudio(targetFile || undefined);
+                    onClose();
+                  }}
+                  className="w-full flex items-center gap-2 rounded-xl px-2.5 py-1.5 text-left text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition"
+                >
+                  <Shield className="h-3.5 w-3.5 text-cyan-500" />
+                  <span>Steganography Studio (Hide / Reveal)...</span>
+                </button>
+              )}
+
               {onOpenWatermarkStudio && (
                 <button
                   type="button"

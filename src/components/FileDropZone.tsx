@@ -26,12 +26,14 @@ import {
   Zap,
   MoreVertical,
   Loader2,
+  Shield,
 } from 'lucide-react';
 import { formatBytes, getFileCategory, FileCategory } from '../utils/format';
 import { TransferHistoryItem, TransferProgress } from '../types';
 import { safeLocalStorage } from '../utils/storage';
 import { FileContextMenu } from './FileContextMenu';
 import { quickWatermarkFile, quickConvertFile } from '../utils/quickActions';
+import { encodeDataToImage } from '../utils/steganography';
 
 export interface RecentUploadRecord {
   id: string;
@@ -56,6 +58,7 @@ interface FileDropZoneProps {
   isPaid?: boolean;
   onOpenWatermark?: (file?: File) => void;
   onOpenConverter?: (file?: File) => void;
+  onOpenSteganography?: (file?: File) => void;
   onOpenAIAnalyze?: (file?: File) => void;
   history?: TransferHistoryItem[];
   currentTransfer?: TransferProgress | null;
@@ -86,6 +89,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
   isPaid = false,
   onOpenWatermark,
   onOpenConverter,
+  onOpenSteganography,
   onOpenAIAnalyze,
   history = [],
   currentTransfer = null,
@@ -117,7 +121,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
 
   const [isProcessingAction, setIsProcessingAction] = useState(false);
   const [processingActionName, setProcessingActionName] = useState<string | null>(null);
-  const pendingQuickActionRef = useRef<'watermark_and_send' | 'convert_and_send' | null>(null);
+  const pendingQuickActionRef = useRef<'watermark_and_send' | 'convert_and_send' | 'stego_and_send' | null>(null);
 
   useEffect(() => {
     if (toast) {
@@ -372,7 +376,53 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
     }
   };
 
-  const triggerPickAndAction = (action: 'watermark_and_send' | 'convert_and_send') => {
+  const handleSteganographyAndSend = async (file: File, index?: number | null) => {
+    if (!isSignedIn) {
+      onRequireAuth();
+      return;
+    }
+
+    try {
+      setIsProcessingAction(true);
+      setProcessingActionName(`Concealing "${file.name}" into Stego Carrier...`);
+
+      const { stegoFile } = await encodeDataToImage({
+        filePayload: file,
+        coverTheme: 'nebula',
+      });
+
+      if (typeof index === 'number' && index >= 0 && index < selectedFiles.length) {
+        const updated = [...selectedFiles];
+        updated[index] = stegoFile;
+        onClearFiles();
+        onFilesSelected(updated);
+      } else {
+        onFilesSelected([stegoFile]);
+      }
+
+      recordUploads([stegoFile]);
+
+      setToast({
+        text: `🕵️ Hidden "${file.name}" into Stego Carrier PNG! Starting peer transfer...`,
+        type: 'success',
+      });
+
+      setTimeout(() => {
+        onStartTransfer();
+      }, 350);
+    } catch (err: any) {
+      console.error('Quick steganography failed:', err);
+      setToast({
+        text: `Steganography failed: ${err?.message || 'Could not process file'}`,
+        type: 'error',
+      });
+    } finally {
+      setIsProcessingAction(false);
+      setProcessingActionName(null);
+    }
+  };
+
+  const triggerPickAndAction = (action: 'watermark_and_send' | 'convert_and_send' | 'stego_and_send') => {
     if (!isSignedIn) {
       onRequireAuth();
       return;
@@ -428,6 +478,9 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
         } else if (action === 'convert_and_send') {
           handleConvertAndSend(filesArray[0]);
           return;
+        } else if (action === 'stego_and_send') {
+          handleSteganographyAndSend(filesArray[0]);
+          return;
         }
       }
 
@@ -452,6 +505,9 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
           return;
         } else if (action === 'convert_and_send') {
           handleConvertAndSend(filesArray[0]);
+          return;
+        } else if (action === 'stego_and_send') {
+          handleSteganographyAndSend(filesArray[0]);
           return;
         }
       }
@@ -625,6 +681,43 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
             >
               <Layers className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
               <span>Convert PDF ⇄ Word</span>
+            </div>
+          )}
+
+          {/* Quick Action: Stego & Send */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (selectedFiles.length > 0) {
+                handleSteganographyAndSend(selectedFiles[0], 0);
+              } else {
+                triggerPickAndAction('stego_and_send');
+              }
+            }}
+            disabled={isProcessingAction}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-cyan-600 bg-cyan-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-cyan-700 active:scale-95 transition disabled:opacity-50"
+            title="Conceal file inside innocent carrier image and send in 1 click"
+          >
+            {isProcessingAction && processingActionName?.includes('Conceal') ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Shield className="h-3.5 w-3.5" />
+            )}
+            <span>Steganography & Send</span>
+          </button>
+
+          {onOpenSteganography && (
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenSteganography(selectedFiles[0] || undefined);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-cyan-200 bg-cyan-50/80 px-3 py-1.5 text-xs font-semibold text-cyan-800 hover:bg-cyan-100 dark:border-cyan-900/50 dark:bg-cyan-950/40 dark:text-cyan-300 transition cursor-pointer"
+              title="Open full Steganography Studio (Hide or Extract)"
+            >
+              <Shield className="h-3.5 w-3.5 text-cyan-600 dark:text-cyan-400" />
+              <span>Stego Studio</span>
             </div>
           )}
         </div>
@@ -852,6 +945,21 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
                   <span>Convert & Send</span>
                 </button>
 
+                <button
+                  type="button"
+                  onClick={() => handleSteganographyAndSend(selectedFiles[0], 0)}
+                  disabled={isProcessingAction}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-cyan-700 active:scale-95 transition disabled:opacity-50"
+                  title="Conceal file inside stego carrier image and initiate transfer"
+                >
+                  {isProcessingAction && processingActionName?.includes('Conceal') ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Shield className="h-3 w-3" />
+                  )}
+                  <span>Stego & Send</span>
+                </button>
+
                 {onOpenAIAnalyze && (
                   <button
                     type="button"
@@ -924,6 +1032,18 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
                         >
                           <FileText className="h-3 w-3" />
                           <span className="hidden sm:inline">Convert & Send</span>
+                        </button>
+
+                        {/* 1-Click Steganography & Send for this specific file */}
+                        <button
+                          type="button"
+                          onClick={() => handleSteganographyAndSend(file, idx)}
+                          disabled={isProcessingAction}
+                          title="Conceal inside stego carrier image & beam in 1 click"
+                          className="flex items-center gap-1 rounded-lg border border-cyan-200 bg-cyan-50/80 px-2 py-1 text-[11px] font-semibold text-cyan-800 hover:bg-cyan-100 dark:border-cyan-900/60 dark:bg-cyan-950 dark:text-cyan-300 transition"
+                        >
+                          <Shield className="h-3 w-3" />
+                          <span className="hidden sm:inline">Stego</span>
                         </button>
 
                         {/* File Action Context Menu Trigger Button */}
@@ -1041,6 +1161,10 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
         onOpenConverterStudio={(file) => {
           if (onOpenConverter) onOpenConverter(file || undefined);
         }}
+        onOpenSteganographyStudio={(file) => {
+          if (onOpenSteganography) onOpenSteganography(file || undefined);
+        }}
+        onSteganographyAndSend={handleSteganographyAndSend}
         onOpenAIAnalyze={(file) => {
           if (onOpenAIAnalyze) onOpenAIAnalyze(file || undefined);
         }}

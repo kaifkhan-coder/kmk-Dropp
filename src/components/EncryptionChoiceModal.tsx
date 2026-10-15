@@ -21,6 +21,7 @@ interface EncryptionChoiceModalProps {
   userPaidEmail?: string;
   onSelectStandard: () => void;
   onSelectEncrypted: () => void;
+  onSelectStego?: () => void;
   onOpenPayment: () => void;
 }
 
@@ -32,13 +33,14 @@ export const EncryptionChoiceModal: React.FC<EncryptionChoiceModalProps> = ({
   userPaidEmail,
   onSelectStandard,
   onSelectEncrypted,
+  onSelectStego,
   onOpenPayment,
 }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-fade-in">
-      <div className="relative w-full max-w-xl rounded-3xl border border-neutral-200 bg-white p-6 shadow-2xl dark:border-neutral-800 dark:bg-neutral-950 sm:p-7">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-fade-in overflow-y-auto">
+      <div className="relative w-full max-w-2xl rounded-3xl border border-neutral-200 bg-white p-5 sm:p-7 shadow-2xl dark:border-neutral-800 dark:bg-neutral-950 my-8">
         <button
           onClick={onClose}
           className="absolute right-5 top-5 rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-800 dark:hover:text-neutral-200 transition"
@@ -47,21 +49,21 @@ export const EncryptionChoiceModal: React.FC<EncryptionChoiceModalProps> = ({
         </button>
 
         {/* Title */}
-        <div className="mb-6 space-y-1.5 text-center sm:text-left">
+        <div className="mb-5 space-y-1.5 text-center sm:text-left">
           <div className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50/80 px-3 py-1 text-xs font-semibold text-indigo-700 dark:border-indigo-900/60 dark:bg-indigo-950/60 dark:text-indigo-300">
             <Shield className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
             <span>Transfer Security Protocol</span>
           </div>
           <h2 className="text-xl sm:text-2xl font-extrabold text-neutral-900 dark:text-white">
-            Do you want this transfer to be Encrypted?
+            Choose Your Transfer Mode
           </h2>
           <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
-            Choose whether to send with standard direct peer transit, or protect files with client-side Zero-Knowledge End-to-End Encryption & Decryption.
+            Select standard direct transit, end-to-end military encryption, or conceal files into an innocent cover image with steganography.
           </p>
         </div>
 
-        {/* Two Options */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Three Options */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
           {/* Option 1: Standard Free Transfer */}
           <div className="rounded-2xl border border-neutral-200 bg-neutral-50/60 p-5 dark:border-neutral-800 dark:bg-neutral-900/40 flex flex-col justify-between hover:border-neutral-300 transition">
             <div>
@@ -143,7 +145,7 @@ export const EncryptionChoiceModal: React.FC<EncryptionChoiceModalProps> = ({
                 className="mt-5 w-full flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 py-2 px-3 text-xs font-bold text-white shadow-sm hover:bg-indigo-700 transition"
               >
                 <Lock className="h-3.5 w-3.5" />
-                <span>Send with E2EE Encryption</span>
+                <span>Send with E2EE</span>
               </button>
             ) : (
               <button
@@ -155,9 +157,48 @@ export const EncryptionChoiceModal: React.FC<EncryptionChoiceModalProps> = ({
                 className="mt-5 w-full flex items-center justify-center gap-1.5 rounded-xl bg-neutral-900 py-2 px-3 text-xs font-bold text-white shadow-sm hover:bg-neutral-800 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100 transition"
               >
                 <KeyRound className="h-3.5 w-3.5 text-amber-400" />
-                <span>Unlock for ₹199 (Open QR)</span>
+                <span>Unlock for ₹199</span>
               </button>
             )}
+          </div>
+
+          {/* Option 3: Steganography Concealment (Camouflage in Image) */}
+          <div className="relative rounded-2xl border-2 border-cyan-500/80 bg-gradient-to-b from-cyan-50/40 to-white p-5 dark:from-cyan-950/30 dark:to-neutral-900/60 flex flex-col justify-between shadow-sm">
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-600 text-white shadow-md">
+                  <Shield className="h-4 w-4" />
+                </div>
+                <span className="rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-bold text-cyan-800 dark:bg-cyan-950 dark:text-cyan-300">
+                  Steganography
+                </span>
+              </div>
+
+              <h3 className="text-sm font-bold text-neutral-900 dark:text-white flex items-center gap-1.5">
+                <span>Steganography Mode</span>
+              </h3>
+              <p className="mt-1 text-[11px] text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                Conceals your secret file inside an innocent cover PNG picture. Receiver on mobile or PC automatically detects & converts it to normal data!
+              </p>
+
+              <div className="mt-2.5 rounded-lg bg-cyan-50 border border-cyan-200/80 p-2 text-[10px] text-cyan-800 dark:bg-cyan-950/50 dark:border-cyan-900/60 dark:text-cyan-300 font-medium">
+                1-bit LSB modulation across RGB channels. Zero visual distortion.
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (onSelectStego) {
+                  onSelectStego();
+                }
+                onClose();
+              }}
+              className="mt-5 w-full flex items-center justify-center gap-1.5 rounded-xl bg-cyan-600 py-2 px-3 text-xs font-bold text-white shadow-sm hover:bg-cyan-700 active:scale-95 transition"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              <span>Conceal & Send (Stego)</span>
+            </button>
           </div>
         </div>
       </div>

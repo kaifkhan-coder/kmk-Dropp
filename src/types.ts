@@ -134,6 +134,19 @@ export interface ReceivedFileItem {
   burnAfterDownload?: boolean;
   burned?: boolean;
   securityReport?: SecurityScanReport;
+
+  // Steganography attributes
+  isStegoCarrier?: boolean;
+  stegoDetected?: boolean;
+  stegoExtractedResult?: {
+    type: 'text' | 'file';
+    file?: File;
+    text?: string;
+    name?: string;
+    size: number;
+    mimeType?: string;
+    downloadUrl?: string;
+  };
 }
 
 export interface TransferHistoryItem {
@@ -147,6 +160,8 @@ export interface TransferHistoryItem {
   peerName?: string;
   status: 'completed' | 'cancelled' | 'failed';
   downloadUrl?: string;
+  isStegoCarrier?: boolean;
+  stegoExtractedName?: string;
 }
 
 export interface PeerDevice {

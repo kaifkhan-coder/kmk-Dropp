@@ -41,11 +41,16 @@ import { BeamDropAIChatbot } from './components/BeamDropAIChatbot';
 import { AIFileAnalyzerModal } from './components/AIFileAnalyzerModal';
 import { IOSLaunchModal } from './components/IOSLaunchModal';
 import { IOSSmartBanner } from './components/IOSSmartBanner';
+import { SteganographyStudioModal } from './components/SteganographyStudioModal';
+import { StegoReceiverCard } from './components/StegoReceiverCard';
+import { AnimatedTransferBeam } from './components/AnimatedTransferBeam';
 import { usePWAInstall } from './hooks/usePWAInstall';
 import { useTransferEngine } from './hooks/useTransferEngine';
 import { ThemeMode, UserSession, ReceivedFileItem, AdminSession, ScannedQRConnection } from './types';
 import { formatBytes } from './utils/format';
 import { safeLocalStorage } from './utils/storage';
+import { encodeDataToImage } from './utils/steganography';
+import { soundFx } from './utils/soundEffects';
 
 export default function App() {
   // Theme state: light, dark, oled
@@ -74,6 +79,10 @@ export default function App() {
   // Document Converter Modal State (PDF ⇄ Word, Text, Image)
   const [isConverterOpen, setIsConverterOpen] = useState(false);
   const [converterTargetFile, setConverterTargetFile] = useState<File | null>(null);
+
+  // Steganography Concealment & Reveal Studio State
+  const [isStegoModalOpen, setIsStegoModalOpen] = useState(false);
+  const [stegoTargetFile, setStegoTargetFile] = useState<File | null>(null);
 
   // BeamDrop AI Assistant & File Intelligence Suite
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
@@ -180,6 +189,8 @@ export default function App() {
     localBattery,
     currentTransfer,
     receivedFiles,
+    setReceivedFiles,
+    convertReceivedStegoToNormal,
     history,
     isPaused,
     transferFile,
@@ -296,6 +307,52 @@ export default function App() {
     if (!fileToTransfer) return;
     await transferFile(fileToTransfer);
     setSelectedFiles((prev) => prev.slice(1));
+  };
+
+  // Convert and send file as Steganography Carrier Image
+  const handleStegoAndSend = async (file: File) => {
+    try {
+      soundFx.playSound('stego_encode');
+      soundFx.triggerHaptic('stego');
+      const { stegoFile } = await encodeDataToImage({
+        filePayload: file,
+        coverTheme: 'nebula',
+      });
+      await transferFile(stegoFile);
+      setSelectedFiles((prev) => prev.filter((f) => f !== file));
+    } catch (err: any) {
+      console.error('Steganography transfer error:', err);
+    }
+  };
+
+  // Convert and beam confidential text as Steganography Carrier Image
+  const handleSendStegoText = async (text: string) => {
+    try {
+      soundFx.playSound('stego_encode');
+      soundFx.triggerHaptic('stego');
+      const { stegoFile } = await encodeDataToImage({
+        textPayload: text,
+        coverTheme: 'cyber',
+      });
+      await transferFile(stegoFile);
+    } catch (err: any) {
+      console.error('Steganography text transfer error:', err);
+    }
+  };
+
+  const handleConvertStegoSuccess = (fileId: string, result: any) => {
+    setReceivedFiles((prev) =>
+      prev.map((item) => {
+        if (item.id === fileId) {
+          return {
+            ...item,
+            stegoDetected: true,
+            stegoExtractedResult: result,
+          };
+        }
+        return item;
+      })
+    );
   };
 
   const handleOpenWatermarkModal = (file?: File) => {
@@ -418,6 +475,10 @@ export default function App() {
         }}
         e2eePrice={e2eePrice}
         onOpenIOSLaunch={() => setIsIOSModalOpen(true)}
+        onOpenSteganography={() => {
+          setStegoTargetFile(null);
+          setIsStegoModalOpen(true);
+        }}
       />
 
       {/* iOS Smart Launch & Install Banner */}
@@ -427,7 +488,19 @@ export default function App() {
         isInstalled={isInstalled}
       />
 
-      <main className="mx-auto max-w-6xl px-4 py-8 w-full flex-1 space-y-10">
+      <main className="mx-auto max-w-6xl px-4 py-8 w-full flex-1 space-y-8">
+        {/* Animated Cyber Transfer Bridge between PC and Mobile */}
+        <AnimatedTransferBeam
+          progress={currentTransfer}
+          peers={peers}
+          myDeviceName={myDevice.name}
+          isP2PConnected={isP2PConnected}
+          isStegoActive={Boolean(
+            currentTransfer?.fileName?.toLowerCase()?.includes('stego') ||
+            (currentTransfer?.fileType?.includes('png') && currentTransfer?.fileName?.toLowerCase()?.includes('beamdrop'))
+          )}
+        />
+
         {/* TAB 1: SEND FILES */}
         {currentTab === 'send' && (
           <div className="space-y-8 animate-fade-in">
@@ -600,6 +673,10 @@ export default function App() {
                 onTogglePause={togglePause}
                 onCancel={cancelTransfer}
                 onReset={resetTransferState}
+                onExtractStego={() => {
+                  setStegoTargetFile(null);
+                  setIsStegoModalOpen(true);
+                }}
               />
             )}
 
@@ -627,6 +704,10 @@ export default function App() {
                     setConverterTargetFile(file || null);
                     setIsConverterOpen(true);
                   }}
+                  onOpenSteganography={(file) => {
+                    setStegoTargetFile(file || null);
+                    setIsStegoModalOpen(true);
+                  }}
                   onOpenAIAnalyze={(file) => {
                     setAIAnalyzerTargetFile(file || selectedFiles[0] || null);
                     setIsAIAnalyzerOpen(true);
@@ -645,45 +726,64 @@ export default function App() {
                       </h4>
                     </div>
 
-                    <div className="divide-y divide-neutral-100 dark:divide-neutral-800/80 max-h-60 overflow-y-auto">
-                      {receivedFiles.map((file) => (
-                        <div key={file.id} className="flex items-center justify-between py-2.5">
-                          <div className="truncate pr-3">
-                            <p className="truncate text-xs font-medium text-neutral-900 dark:text-white font-mono">
-                              {file.name}
-                            </p>
-                            <p className="text-[11px] font-mono text-neutral-500">
-                              {formatBytes(file.size)} · SHA-256 verified
-                            </p>
-                          </div>
+                    <div className="divide-y divide-neutral-100 dark:divide-neutral-800/80 max-h-72 overflow-y-auto space-y-1">
+                      {receivedFiles.map((file) => {
+                        const isStego =
+                          file.isStegoCarrier ||
+                          file.stegoDetected ||
+                          file.name.toLowerCase().includes('stego');
 
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <button
-                              onClick={() => setPreviewFile(file)}
-                              className="flex items-center gap-1 rounded-lg border border-neutral-200 py-1 px-2.5 text-xs text-neutral-700 hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-800"
-                            >
-                              <Eye className="h-3 w-3" />
-                              <span>Preview</span>
-                            </button>
-                            <button
-                              onClick={() => {
-                                if (!user) {
-                                  setIsAuthOpen(true);
-                                  return;
-                                }
-                                const a = document.createElement('a');
-                                a.href = file.url;
-                                a.download = file.name;
-                                a.click();
-                              }}
-                              className="flex items-center gap-1 rounded-lg bg-neutral-900 py-1 px-2.5 text-xs font-medium text-white hover:bg-neutral-800 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100"
-                            >
-                              <Download className="h-3 w-3" />
-                              <span>{user ? 'Save' : 'Sign In to Save'}</span>
-                            </button>
+                        if (isStego) {
+                          return (
+                            <div key={file.id} className="py-2">
+                              <StegoReceiverCard
+                                item={file}
+                                onConvertSuccess={handleConvertStegoSuccess}
+                                onPreviewFile={setPreviewFile}
+                              />
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div key={file.id} className="flex items-center justify-between py-2.5">
+                            <div className="truncate pr-3">
+                              <p className="truncate text-xs font-medium text-neutral-900 dark:text-white font-mono">
+                                {file.name}
+                              </p>
+                              <p className="text-[11px] font-mono text-neutral-500">
+                                {formatBytes(file.size)} · SHA-256 verified
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                onClick={() => setPreviewFile(file)}
+                                className="flex items-center gap-1 rounded-lg border border-neutral-200 py-1 px-2.5 text-xs text-neutral-700 hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                              >
+                                <Eye className="h-3 w-3" />
+                                <span>Preview</span>
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (!user) {
+                                    setIsAuthOpen(true);
+                                    return;
+                                  }
+                                  const a = document.createElement('a');
+                                  a.href = file.url;
+                                  a.download = file.name;
+                                  a.click();
+                                }}
+                                className="flex items-center gap-1 rounded-lg bg-neutral-900 py-1 px-2.5 text-xs font-medium text-white hover:bg-neutral-800 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100"
+                              >
+                                <Download className="h-3 w-3" />
+                                <span>{user ? 'Save' : 'Sign In to Save'}</span>
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -836,35 +936,54 @@ export default function App() {
                       Files sent from paired devices will appear here automatically.
                     </div>
                   ) : (
-                    <div className="divide-y divide-neutral-100 dark:divide-neutral-800 max-h-72 overflow-y-auto">
-                      {receivedFiles.map((item) => (
-                        <div key={item.id} className="flex items-center justify-between py-2.5">
-                          <div className="truncate pr-3">
-                            <p className="truncate text-xs font-medium text-neutral-900 dark:text-white font-mono">
-                              {item.name}
-                            </p>
-                            <p className="text-[11px] font-mono text-neutral-500">
-                              {formatBytes(item.size)}
-                            </p>
-                          </div>
+                    <div className="divide-y divide-neutral-100 dark:divide-neutral-800 max-h-72 overflow-y-auto space-y-1">
+                      {receivedFiles.map((item) => {
+                        const isStego =
+                          item.isStegoCarrier ||
+                          item.stegoDetected ||
+                          item.name.toLowerCase().includes('stego');
 
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <button
-                              onClick={() => setPreviewFile(item)}
-                              className="rounded-lg border border-neutral-200 py-1 px-2 text-xs text-neutral-600 hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-300"
-                            >
-                              <Eye className="h-3 w-3" />
-                            </button>
-                            <a
-                              href={item.url}
-                              download={item.name}
-                              className="rounded-lg bg-neutral-900 py-1 px-2.5 text-xs text-white hover:bg-neutral-800 dark:bg-white dark:text-neutral-950"
-                            >
-                              <Download className="h-3 w-3" />
-                            </a>
+                        if (isStego) {
+                          return (
+                            <div key={item.id} className="py-2">
+                              <StegoReceiverCard
+                                item={item}
+                                onConvertSuccess={handleConvertStegoSuccess}
+                                onPreviewFile={setPreviewFile}
+                              />
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div key={item.id} className="flex items-center justify-between py-2.5">
+                            <div className="truncate pr-3">
+                              <p className="truncate text-xs font-medium text-neutral-900 dark:text-white font-mono">
+                                {item.name}
+                              </p>
+                              <p className="text-[11px] font-mono text-neutral-500">
+                                {formatBytes(item.size)}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                onClick={() => setPreviewFile(item)}
+                                className="rounded-lg border border-neutral-200 py-1 px-2 text-xs text-neutral-600 hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-300"
+                              >
+                                <Eye className="h-3 w-3" />
+                              </button>
+                              <a
+                                href={item.url}
+                                download={item.name}
+                                className="rounded-lg bg-neutral-900 py-1 px-2.5 text-xs text-white hover:bg-neutral-800 dark:bg-white dark:text-neutral-950"
+                              >
+                                <Download className="h-3 w-3" />
+                              </a>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -879,6 +998,7 @@ export default function App() {
             messages={textMessages}
             peers={peers}
             onSendMessage={sendTextMessage}
+            onSendStegoText={handleSendStegoText}
             onClearMessages={clearTextMessages}
             isSignedIn={Boolean(user)}
             onRequireAuth={() => setIsAuthOpen(true)}
@@ -1010,6 +1130,11 @@ export default function App() {
         userPaidEmail={paidEmail}
         onSelectStandard={() => handleExecuteTransfer(false)}
         onSelectEncrypted={() => handleExecuteTransfer(true)}
+        onSelectStego={() => {
+          if (selectedFiles.length > 0) {
+            handleStegoAndSend(selectedFiles[0]);
+          }
+        }}
         onOpenPayment={() => setIsPaymentModalOpen(true)}
       />
 
@@ -1071,6 +1196,21 @@ export default function App() {
         isOpen={isIOSModalOpen}
         onClose={() => setIsIOSModalOpen(false)}
         isIOSDevice={isIOS}
+      />
+
+      {/* 16. Steganography Studio (Conceal & Reveal) Modal */}
+      <SteganographyStudioModal
+        isOpen={isStegoModalOpen}
+        onClose={() => {
+          setIsStegoModalOpen(false);
+          setStegoTargetFile(null);
+        }}
+        initialFile={stegoTargetFile}
+        onSendStegoFile={(file) => {
+          transferFile(file);
+          setIsStegoModalOpen(false);
+        }}
+        isPeerConnected={peers.length > 0}
       />
 
       {/* Floating AI Assistant Trigger Button (Bottom Right) */}

@@ -46,6 +46,7 @@ interface HeaderProps {
   onOpenConverter?: () => void;
   e2eePrice?: number;
   onOpenIOSLaunch?: () => void;
+  onOpenSteganography?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -73,6 +74,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenConverter,
   e2eePrice = 199,
   onOpenIOSLaunch,
+  onOpenSteganography,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -241,6 +243,18 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right Section: Actions & Mobile Hamburger */}
         <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Steganography Studio Button */}
+          {onOpenSteganography && (
+            <button
+              onClick={onOpenSteganography}
+              title="Open Steganography Studio (Conceal or Reveal Hidden Data)"
+              className="flex items-center gap-1.5 rounded-xl border border-cyan-200 bg-cyan-50/70 px-2 sm:px-2.5 py-1.5 text-xs font-semibold text-cyan-800 hover:bg-cyan-100 hover:border-cyan-300 dark:border-cyan-900/60 dark:bg-cyan-950/40 dark:text-cyan-300 dark:hover:bg-cyan-900 transition"
+            >
+              <Shield className="h-3.5 w-3.5 text-cyan-600 dark:text-cyan-400" />
+              <span className="hidden xs:inline sm:inline">Stego</span>
+            </button>
+          )}
+
           {/* iOS App Launch Button */}
           {onOpenIOSLaunch && (
             <button
@@ -406,6 +420,19 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 <Sparkles className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
                 <span>BeamDrop AI Assistant (Q&A)</span>
+              </button>
+            )}
+
+            {onOpenSteganography && (
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onOpenSteganography();
+                }}
+                className="flex items-center gap-2 rounded-xl p-2.5 text-xs font-semibold text-cyan-800 bg-cyan-50 dark:bg-cyan-950/40 dark:text-cyan-300"
+              >
+                <Shield className="h-3.5 w-3.5 text-cyan-600 dark:text-cyan-400" />
+                <span>Steganography Studio (Hide & Reveal)</span>
               </button>
             )}
 

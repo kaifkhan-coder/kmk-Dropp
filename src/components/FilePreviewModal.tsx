@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Download, X, Eye, FileText, CheckCircle, ShieldCheck, ExternalLink, Image as ImageIcon, Archive } from 'lucide-react';
+import { Download, X, Eye, FileText, CheckCircle, ShieldCheck, ExternalLink, Image as ImageIcon, Archive, Shield, Scan } from 'lucide-react';
 import { ReceivedFileItem } from '../types';
 import { formatBytes, getFileCategory } from '../utils/format';
+import { isSteganographyImage } from '../utils/steganography';
 
 interface FilePreviewModalProps {
   file: ReceivedFileItem | null;
@@ -9,6 +10,7 @@ interface FilePreviewModalProps {
   onClose: () => void;
   isSignedIn?: boolean;
   onRequireAuth?: () => void;
+  onOpenSteganography?: (file: File) => void;
 }
 
 export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
@@ -17,17 +19,28 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
   onClose,
   isSignedIn = true,
   onRequireAuth,
+  onOpenSteganography,
 }) => {
   const [textContent, setTextContent] = useState<string | null>(null);
   const [copiedChecksum, setCopiedChecksum] = useState(false);
+  const [hasStego, setHasStego] = useState<boolean>(false);
 
   useEffect(() => {
     if (!file) {
       setTextContent(null);
+      setHasStego(false);
       return;
     }
 
     const category = getFileCategory(file.name, file.type);
+    if (category === 'image') {
+      isSteganographyImage(file.blob).then((detected) => {
+        setHasStego(detected);
+      });
+    } else {
+      setHasStego(false);
+    }
+
     if (category === 'code' || file.name.endsWith('.txt') || file.type.includes('text')) {
       const reader = new FileReader();
       reader.onload = () => {
@@ -119,6 +132,21 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            {hasStego && onOpenSteganography && (
+              <button
+                onClick={() => {
+                  const fileObj = new File([file.blob], file.name, { type: file.type || 'image/png' });
+                  onOpenSteganography(fileObj);
+                  onClose();
+                }}
+                className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 px-3.5 py-2 text-xs font-bold text-white shadow-md shadow-cyan-600/20 hover:opacity-95 transition animate-pulse"
+                title="Extract and convert hidden steganography data"
+              >
+                <Scan className="h-3.5 w-3.5" />
+                <span>Extract Stego Secret</span>
+              </button>
+            )}
+
             <button
               onClick={handleDownload}
               className="flex items-center gap-2 rounded-xl bg-neutral-900 px-4 py-2 text-xs font-semibold text-white hover:bg-neutral-800 transition dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100"
