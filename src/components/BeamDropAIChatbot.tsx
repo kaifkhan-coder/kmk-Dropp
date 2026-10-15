@@ -25,11 +25,12 @@ interface ChatMessage {
 }
 
 const STARTER_PROMPTS = [
+  'How do I launch BeamDrop on iOS?',
+  'Give 1 answer for all questions',
   'How do I pair my phone with my laptop?',
   'How does PDF to Word conversion work?',
   'Why is my payment pending admin approval?',
   'What are the advantages of End-to-End Encryption?',
-  'How do I watermark sensitive files?',
 ];
 
 interface BeamDropAIChatbotProps {
@@ -93,6 +94,14 @@ export const BeamDropAIChatbot: React.FC<BeamDropAIChatbotProps> = ({
 
     if (q.includes('speed') || q.includes('chart') || q.includes('throughput') || q.includes('mb/s') || q.includes('recharts')) {
       return `### Real-Time Throughput Monitor\n\n- **Direct WebRTC Speed**: Files transfer directly between devices over local Wi-Fi, reaching high throughput.\n- **Recharts Line Chart**: As files are transferred, TransferProgressView displays a live throughput chart (MB/s), current speed, peak speed, and time remaining.\n- **Offline LAN Fallback**: If external internet drops, BeamDrop switches to local LAN mesh mode so devices on the same Wi-Fi continue transferring uninterrupted.`;
+    }
+
+    if (q.includes('ios') || q.includes('iphone') || q.includes('apple') || q.includes('ipad')) {
+      return `### Launching BeamDrop on Apple iOS (iPhone & iPad)\n\n1. **Open in Apple Safari**: Visit BeamDrop on Safari.\n2. **Tap Share (⎋)**: Tap the Share button on Safari's bottom toolbar.\n3. **Select "Add to Home Screen"**: Choose **Add to Home Screen** from the action menu.\n4. **Tap "Add"**: BeamDrop launches immediately in full-screen standalone mode with Apple Touch Icons, camera QR scanner, and offline local LAN WebRTC file transfers.`;
+    }
+
+    if (q.includes('1 answer') || q.includes('one answer') || q.includes('all question') || q.includes('single answer')) {
+      return `BeamDrop is the official zero-cloud peer-to-peer file transfer engine engineered by Kaif Khan, enabling instant camera-based QR pairing across iOS and desktop, bi-directional format conversion (PDF ⇄ Word/Text/Images), universal watermarking, and military-grade AES-256-GCM encryption.`;
     }
 
     if (q.includes('payment') || q.includes('approve') || q.includes('price') || q.includes('e2ee') || q.includes('199') || q.includes('upi') || q.includes('license')) {
@@ -275,6 +284,12 @@ export const BeamDropAIChatbot: React.FC<BeamDropAIChatbotProps> = ({
                   </h3>
                   <span className="rounded-full bg-indigo-100 px-1.5 py-0.2 text-[9px] font-bold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
                     Website Only
+                  </span>
+                  <span
+                    title="AI gives exactly 1 definitive answer for all questions"
+                    className="rounded-full bg-emerald-100 px-1.5 py-0.2 text-[9px] font-bold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                  >
+                    1 Answer Mode
                   </span>
                 </div>
                 <div className="flex items-center gap-1 text-[10px] text-neutral-400">

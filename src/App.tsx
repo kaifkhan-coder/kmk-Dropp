@@ -39,6 +39,9 @@ import { PaymentModal } from './components/PaymentModal';
 import { DeviceNameModal } from './components/DeviceNameModal';
 import { BeamDropAIChatbot } from './components/BeamDropAIChatbot';
 import { AIFileAnalyzerModal } from './components/AIFileAnalyzerModal';
+import { IOSLaunchModal } from './components/IOSLaunchModal';
+import { IOSSmartBanner } from './components/IOSSmartBanner';
+import { usePWAInstall } from './hooks/usePWAInstall';
 import { useTransferEngine } from './hooks/useTransferEngine';
 import { ThemeMode, UserSession, ReceivedFileItem, AdminSession, ScannedQRConnection } from './types';
 import { formatBytes } from './utils/format';
@@ -76,6 +79,10 @@ export default function App() {
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
   const [isAIAnalyzerOpen, setIsAIAnalyzerOpen] = useState(false);
   const [aiAnalyzerTargetFile, setAIAnalyzerTargetFile] = useState<File | null>(null);
+
+  // iOS Application Launch & Installation State
+  const [isIOSModalOpen, setIsIOSModalOpen] = useState(false);
+  const { isIOS, isInstalled } = usePWAInstall();
 
   // Paid Feature State: Encrypted & Decrypted Transfer (Admin Configured Price)
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -410,6 +417,14 @@ export default function App() {
           setIsConverterOpen(true);
         }}
         e2eePrice={e2eePrice}
+        onOpenIOSLaunch={() => setIsIOSModalOpen(true)}
+      />
+
+      {/* iOS Smart Launch & Install Banner */}
+      <IOSSmartBanner
+        onOpenIOSModal={() => setIsIOSModalOpen(true)}
+        isIOS={isIOS}
+        isInstalled={isInstalled}
       />
 
       <main className="mx-auto max-w-6xl px-4 py-8 w-full flex-1 space-y-10">
@@ -549,6 +564,15 @@ export default function App() {
                     >
                       <Lock className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                       <span>{isPaid ? 'E2EE Lifetime Active' : 'Unlock E2EE (₹199 QR)'}</span>
+                    </button>
+
+                    <button
+                      onClick={() => setIsIOSModalOpen(true)}
+                      className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50/70 px-4 py-2.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-900/60 dark:bg-indigo-950/40 dark:text-indigo-300 transition"
+                      title="Launch BeamDrop as an Apple iOS Application on iPhone or iPad"
+                    >
+                      <Smartphone className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                      <span>Launch on iOS (iPhone/iPad)</span>
                     </button>
                   </div>
                 </div>
@@ -1040,6 +1064,13 @@ export default function App() {
           setConverterTargetFile(target);
           setIsConverterOpen(true);
         }}
+      />
+
+      {/* 15. Apple iOS Application Launch & Installation Modal */}
+      <IOSLaunchModal
+        isOpen={isIOSModalOpen}
+        onClose={() => setIsIOSModalOpen(false)}
+        isIOSDevice={isIOS}
       />
 
       {/* Floating AI Assistant Trigger Button (Bottom Right) */}

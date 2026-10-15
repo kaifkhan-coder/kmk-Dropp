@@ -69,11 +69,11 @@ export const MobileConnectionSteps: React.FC<MobileConnectionStepsProps> = ({
     {
       step: 1,
       title: 'Open Your Phone Camera',
-      tag: 'No App Install Needed',
+      tag: 'No App Install Needed · iOS Ready',
       tagColor: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
       icon: <Camera className="h-5 w-5 text-indigo-500" />,
       desc: 'Unlock your iPhone or Android phone and open the default built-in Camera app (or Google Lens).',
-      detail: 'BeamDrop runs entirely in your mobile browser (Safari, Chrome, Firefox, Edge) — no App Store or Play Store downloads needed.',
+      detail: 'BeamDrop runs instantly in Safari or Chrome, and can be added to your iOS Home Screen for a full-screen native app experience.',
     },
     {
       step: 2,

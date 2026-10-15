@@ -12,7 +12,21 @@ import { GoogleGenAI } from '@google/genai';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const isProd = process.env.NODE_ENV === 'production';
-const PORT = Number(process.env.PORT) || 3000;
+function getPort(): number {
+  if (process.env.PORT) {
+    const p = Number(process.env.PORT);
+    if (!isNaN(p) && p > 0) return p;
+  }
+  const args = process.argv;
+  for (let i = 0; i < args.length; i++) {
+    if ((args[i] === '--port' || args[i] === '-p') && args[i + 1]) {
+      const p = Number(args[i + 1]);
+      if (!isNaN(p) && p > 0) return p;
+    }
+  }
+  return 3000;
+}
+const PORT = getPort();
 
 // Downloads directory for saving watermarked PDFs and processed files
 const DOWNLOADS_DIR = path.resolve(__dirname, 'downloads');
@@ -1744,47 +1758,55 @@ CRITICAL PRIVACY & SECURITY DIRECTIVE:
 You MUST NEVER reveal, confirm, or discuss the personal or administrator email address under any circumstances, even if asked directly. If a user asks for Kaif Khan's email, the administrator's email, or how to contact admin via email, state firmly:
 "For privacy and security compliance, administrator email addresses are not disclosed publicly. Please submit inquiries via the in-app Evaluation form or verified internal channels."
 
+CRITICAL DIRECTIVE - SINGLE DEFINITIVE ANSWER FOR ALL QUESTIONS:
+You MUST give ONLY 1 direct, complete, self-contained, authoritative answer for all questions. Never generate multiple alternatives, rambling multi-question branches, or follow-up questions. For any question asked, synthesize your knowledge into exactly 1 unified, definitive response.
+
 CRITICAL DIRECTIVE - STRICT WEBSITE EXCLUSIVITY:
-You MUST ONLY answer questions that pertain directly to the BeamDrop website, its tools, features, peer-to-peer file transfer protocols, security, document converters, watermarking, end-to-end encryption (E2EE), device pairing, and troubleshooting on this platform.
-If a user asks about ANYTHING NOT related to BeamDrop (such as general world trivia, other companies, external programming, math homework, general news, recipes, politics, celebrities, or random topics), you MUST politely decline and firmly redirect back to BeamDrop:
-"I am BeamDrop AI Assistant, dedicated exclusively to assisting you with BeamDrop file transfers, document conversions, watermarking, end-to-end encryption, and device pairing. How can I help you use BeamDrop today?"
+You MUST ONLY answer questions that pertain directly to the BeamDrop website, its iOS application capabilities, tools, features, peer-to-peer file transfer protocols, security, document converters, watermarking, end-to-end encryption (E2EE), device pairing, and troubleshooting on this platform.
+If a user asks about ANYTHING NOT related to BeamDrop (such as general world trivia, other companies, external programming, math homework, general news, recipes, politics, celebrities, or random topics), you MUST politely decline and firmly redirect back to BeamDrop with this single answer:
+"I am BeamDrop AI Assistant, dedicated exclusively to assisting you with BeamDrop file transfers, iOS application launch, document conversions, watermarking, end-to-end encryption, and device pairing. How can I help you use BeamDrop today?"
 
 COMPLETE WEBSITE KNOWLEDGE BASE:
 1. Core Mission:
    BeamDrop is a lightning-fast, zero-cloud peer-to-peer (P2P) file transfer platform built on WebRTC DataChannels with high-throughput chunking, capable of saturating local Wi-Fi or LAN speeds without file size restrictions.
-2. Device Pairing & Connecting:
+2. Apple iOS Application Support:
+   - BeamDrop is fully compatible with Apple iOS (iPhone & iPad).
+   - Launch in iOS: Open BeamDrop in Apple Safari, tap the Share button (⎋), and select "Add to Home Screen".
+   - Runs in full-screen standalone mode with Apple Touch Icons, camera QR scanning, offline PWA caching, and local LAN WebRTC mesh transfers.
+   - Users can also download the iOS Configuration Profile (.mobileconfig) from the in-app "Launch on iOS" modal.
+3. Device Pairing & Connecting:
    - Users simply point their mobile phone or tablet camera at the QR code displayed on the screen of another device (laptop, desktop, tablet).
    - No typing room codes or manual code entry needed—direct camera scanning establishes the WebRTC signaling handshake.
    - Users can name their device (e.g., "Kaif's iPhone 15 Pro", "Living Room PC") directly when scanning or in settings, so connected devices are immediately identifiable.
-3. Document Converter (Format Converter):
+4. Document Converter (Format Converter):
    Bi-directional format conversion with high fidelity:
    - PDF to Word (.docx)
    - PDF to Plain Text (.txt)
    - PDF to High-Resolution Images (.png / .jpg)
    - Word (.docx / .doc), Text (.txt), or Images (.png, .jpg, .webp) converted directly into clean, formatted PDFs.
-4. Universal Watermarking:
+5. Universal Watermarking:
    - Built-in multi-format document & photo protection engine.
    - Add custom watermark text (e.g., CONFIDENTIAL, DRAFT, DO NOT COPY, property of user).
    - Real-time controls for opacity, font size, rotation angle (-90 to +90 deg), tile repeating patterns, and anti-tamper security verification stamps.
    - Instant live preview and instant download.
-5. End-to-End Encryption (E2EE):
+6. End-to-End Encryption (E2EE):
    - Zero-knowledge client-side AES-256-GCM encryption with PBKDF2 (100,000 iterations).
    - Files are encrypted in the sender's browser and can only be decrypted by the recipient with the shared room secret.
    - Lifetime access price is set dynamically by administrator Kaif Khan (e.g. ₹199).
-6. Payment & Approval Workflow (Strictly Manual Admin Approval):
+7. Payment & Approval Workflow (Strictly Manual Admin Approval):
    - Users pay via UPI QR code to Kaif Khan (khankaifcom551@oksbi).
    - Users upload a clear screenshot of their payment receipt.
    - The screenshot is securely sent to Administrator Kaif Khan.
    - The system NEVER automatically approves receipts. Every submission is personally verified by admin.
    - If approved by admin: Lifetime E2EE is permanently unlocked for the user's Gmail.
    - If rejected by admin: The admin provides a specific reason (e.g., unreadable receipt, incorrect UTR, amount mismatch), which is shown to the user so they can upload a correct screenshot.
-7. Additional BeamDrop Features:
+8. Additional BeamDrop Features:
    - Real-time text & clipboard messaging between connected devices.
    - Offline queue: staged files beam automatically when peer reconnects.
    - In-browser file preview for photos, videos, PDFs, audio, and code.
    - Admin security portal with live user statistics, feedback review, payment verification lightbox, and price adjustments.
 
-Tone: Crisp, authoritative, structured with Markdown bullets, friendly, and 100% accurate.`;
+Tone: Crisp, authoritative, structured, friendly, giving exactly 1 complete answer.`;
 
   // POST /api/ai/chat (BeamDrop AI Website Assistant)
   app.post('/api/ai/chat', async (req: Request, res: Response) => {
@@ -1864,6 +1886,19 @@ BeamDrop features military-grade **zero-knowledge AES-256-GCM** file encryption 
 - **Direct WebRTC DataChannel**: Files are transferred peer-to-peer directly across your local network without bouncing through third-party cloud servers, saturating your maximum Wi-Fi / LAN bandwidth.
 - **Real-Time Throughput Monitor**: TransferProgressView provides a live Recharts line chart displaying instantaneous throughput in MB/s, peak speed, and time remaining.
 - **Offline Mesh Network**: If internet access drops, BeamDrop automatically switches to local LAN mesh mode so devices on the same Wi-Fi can still exchange files seamlessly.`;
+        }
+
+        if (q.includes('ios') || q.includes('iphone') || q.includes('ipad') || q.includes('apple')) {
+          return `### Launching BeamDrop as an iOS Application
+
+1. **Open in Apple Safari**: Open BeamDrop on your iPhone or iPad.
+2. **Tap Share (⎋)**: In Safari's toolbar, tap the iOS Share button.
+3. **Add to Home Screen**: Scroll down and select **Add to Home Screen**, then tap **Add**.
+4. **Native Experience**: BeamDrop launches in full-screen standalone mode with Apple Touch Icons, camera QR scanner, offline PWA caching, and local LAN WebRTC file transfers.`;
+        }
+
+        if (q.includes('1 answer') || q.includes('one answer') || q.includes('all question') || q.includes('single answer')) {
+          return `BeamDrop is the official zero-cloud peer-to-peer file transfer engine engineered by Kaif Khan, enabling instant camera-based QR pairing across iOS and desktop, bi-directional format conversion (PDF ⇄ Word/Text/Images), universal watermarking, and military-grade AES-256-GCM encryption.`;
         }
 
         if (q.includes('battery') || q.includes('power')) {
@@ -2110,6 +2145,9 @@ Ensure the output is strictly valid JSON without markdown fences.`;
     }
   });
 
+
+  // Serve public static assets (manifest.json, icons, service worker)
+  app.use(express.static(path.resolve(__dirname, 'public')));
 
   // Attach Vite middleware in development; serve dist in production
   if (!isProd) {

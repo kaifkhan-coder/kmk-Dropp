@@ -45,6 +45,7 @@ interface HeaderProps {
   isPaid?: boolean;
   onOpenConverter?: () => void;
   e2eePrice?: number;
+  onOpenIOSLaunch?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -71,6 +72,7 @@ export const Header: React.FC<HeaderProps> = ({
   isPaid = false,
   onOpenConverter,
   e2eePrice = 199,
+  onOpenIOSLaunch,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -239,6 +241,18 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right Section: Actions & Mobile Hamburger */}
         <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* iOS App Launch Button */}
+          {onOpenIOSLaunch && (
+            <button
+              onClick={onOpenIOSLaunch}
+              title="Launch BeamDrop as an Apple iOS Application (iPhone/iPad)"
+              className="flex items-center gap-1.5 rounded-xl border border-neutral-200 bg-neutral-50 px-2 sm:px-2.5 py-1.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-100 hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800 transition"
+            >
+              <Smartphone className="h-3.5 w-3.5 text-indigo-500" />
+              <span className="hidden xs:inline sm:inline">iOS App</span>
+            </button>
+          )}
+
           {/* BeamDrop AI Assistant Chatbot Button */}
           {onOpenChatbot && (
             <button
@@ -392,6 +406,19 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 <Sparkles className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
                 <span>BeamDrop AI Assistant (Q&A)</span>
+              </button>
+            )}
+
+            {onOpenIOSLaunch && (
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onOpenIOSLaunch();
+                }}
+                className="flex items-center gap-2 rounded-xl p-2.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+              >
+                <Smartphone className="h-3.5 w-3.5 text-indigo-500" />
+                <span>Launch on iOS (Add to Home Screen)</span>
               </button>
             )}
           </div>
