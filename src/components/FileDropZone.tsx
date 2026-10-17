@@ -27,6 +27,7 @@ import {
   MoreVertical,
   Loader2,
   Shield,
+  KeyRound,
 } from 'lucide-react';
 import { formatBytes, getFileCategory, FileCategory } from '../utils/format';
 import { TransferHistoryItem, TransferProgress } from '../types';
@@ -62,6 +63,7 @@ interface FileDropZoneProps {
   onOpenAIAnalyze?: (file?: File) => void;
   history?: TransferHistoryItem[];
   currentTransfer?: TransferProgress | null;
+  onOpenCodeTransfer?: () => void;
 }
 
 function formatTimeAgo(timestamp: number): string {
@@ -93,6 +95,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
   onOpenAIAnalyze,
   history = [],
   currentTransfer = null,
+  onOpenCodeTransfer,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [showAllHistory, setShowAllHistory] = useState(false);
@@ -1115,6 +1118,20 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
                     className="w-full sm:w-auto rounded-xl border border-neutral-300 py-2.5 px-4 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800 transition whitespace-nowrap"
                   >
                     Show QR Code
+                  </button>
+                )}
+                {onOpenCodeTransfer && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenCodeTransfer();
+                    }}
+                    className="w-full sm:w-auto flex items-center justify-center gap-1.5 rounded-xl border border-indigo-300 bg-indigo-50/80 py-2.5 px-4 text-xs font-bold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 transition whitespace-nowrap cursor-pointer shadow-xs"
+                    title="Generate a 6-digit code to download these files on any laptop or mobile"
+                  >
+                    <KeyRound className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                    <span>Send via 6-Digit Code</span>
                   </button>
                 )}
                 <button

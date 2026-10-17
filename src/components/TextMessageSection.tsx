@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   Share2,
   Shield,
+  Laptop,
 } from 'lucide-react';
 import { PeerTextMessage, PeerDevice } from '../types';
 

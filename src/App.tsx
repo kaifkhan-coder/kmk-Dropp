@@ -16,8 +16,10 @@ import {
   Lock,
   Sparkles,
   Wifi,
+  KeyRound,
 } from 'lucide-react';
 import { Header } from './components/Header';
+import { CodeTransferSection } from './components/CodeTransferSection';
 import { QRCodeDisplay } from './components/QRCodeDisplay';
 import { QRScannerModal } from './components/QRScannerModal';
 import { FileDropZone } from './components/FileDropZone';
@@ -59,7 +61,26 @@ export default function App() {
   });
 
   // Current active navigation tab
-  const [currentTab, setCurrentTab] = useState<'send' | 'receive' | 'messages' | 'users' | 'history'>('send');
+  const [currentTab, setCurrentTab] = useState<'send' | 'code' | 'receive' | 'messages' | 'users' | 'history'>('send');
+  const [initialCodeParam, setInitialCodeParam] = useState<string>('');
+
+  // Check URL parameters for 6-digit code or direct code tab
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('code');
+      const tab = params.get('tab');
+      if (code && code.trim()) {
+        const clean = code.trim().replace(/\D/g, '').slice(0, 6);
+        if (clean.length === 6) {
+          setInitialCodeParam(clean);
+          setCurrentTab('code');
+        }
+      } else if (tab === 'code' || window.location.hash.includes('code-transfer')) {
+        setCurrentTab('code');
+      }
+    } catch {}
+  }, []);
 
   // Modals
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -587,6 +608,14 @@ export default function App() {
                     </button>
 
                     <button
+                      onClick={() => setCurrentTab('code')}
+                      className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-5 py-2.5 text-xs font-bold text-white shadow-md hover:from-indigo-500 hover:to-purple-500 active:scale-95 transition cursor-pointer"
+                    >
+                      <KeyRound className="h-4 w-4" />
+                      <span>Send with 6-Digit Code</span>
+                    </button>
+
+                    <button
                       onClick={() => setIsScannerOpen(true)}
                       className="inline-flex items-center gap-2 rounded-xl border border-neutral-300 bg-white px-4 py-2.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800 transition"
                     >
@@ -714,6 +743,7 @@ export default function App() {
                   }}
                   history={history}
                   currentTransfer={currentTransfer}
+                  onOpenCodeTransfer={() => setCurrentTab('code')}
                 />
 
                 {/* Recently Received in this Session */}
@@ -814,9 +844,51 @@ export default function App() {
           </div>
         )}
 
+        {/* TAB: 6-DIGIT CODE TRANSFER */}
+        {currentTab === 'code' && (
+          <div className="space-y-6 animate-fade-in">
+            <CodeTransferSection
+              myDeviceName={myDevice.name}
+              initialCode={initialCodeParam}
+              initialMode={initialCodeParam ? 'receive' : 'send'}
+              onFileDownloaded={(fileName, fileSize) => {
+                // Keep track of download
+              }}
+              onSwitchToSendTab={() => setCurrentTab('send')}
+            />
+          </div>
+        )}
+
         {/* TAB 2: RECEIVE / PAIR */}
         {currentTab === 'receive' && (
           <div className="space-y-8 animate-fade-in">
+            {/* Quick Action banner to switch to 6-Digit Code Transfer */}
+            <div className="rounded-2xl border border-indigo-200/90 bg-indigo-50/70 p-5 shadow-sm dark:border-indigo-900/60 dark:bg-indigo-950/40 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white font-bold shadow-sm">
+                  <KeyRound className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-neutral-900 dark:text-white flex items-center gap-2">
+                    <span>Have a 6-Digit Transfer Code?</span>
+                    <span className="rounded-md bg-indigo-100 dark:bg-indigo-900 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700 dark:text-indigo-300">
+                      Direct Download
+                    </span>
+                  </h4>
+                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                    Enter the 6-digit key generated on your sending mobile or laptop to immediately download the files.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setCurrentTab('code')}
+                className="flex items-center gap-1.5 shrink-0 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-indigo-500 transition whitespace-nowrap cursor-pointer"
+              >
+                <span>Enter 6-Digit Code</span>
+                <ArrowRight className="h-3 w-3" />
+              </button>
+            </div>
+
             {/* Step-by-step connection guide */}
             <MobileConnectionSteps
               roomId={roomId}

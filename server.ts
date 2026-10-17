@@ -6,6 +6,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import fs from 'fs';
+import JSZip from 'jszip';
 import { PDFDocument, rgb, degrees, StandardFonts } from 'pdf-lib';
 import { GoogleGenAI } from '@google/genai';
 
@@ -116,8 +117,8 @@ function trackUserPresence(session: PeerSession, incrementTransfer = false) {
 
 async function bootstrap() {
   const app = express();
-  app.use(express.json({ limit: '50mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+  app.use(express.json({ limit: '100mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
   // HTTP server
   const server = http.createServer(app);
@@ -1729,6 +1730,200 @@ async function bootstrap() {
       });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 13B. BeamDrop 6-Digit Code Transfer Engine (Mobile ⇄ PC ⇄ Laptop cross-device code retrieval)
+  interface CodeTransferItem {
+    name: string;
+    size: number;
+    type: string;
+    dataBase64: string;
+  }
+
+  interface CodeTransferPackage {
+    code: string;
+    senderDeviceName: string;
+    files: CodeTransferItem[];
+    totalSize: number;
+    filesCount: number;
+    createdAt: number;
+    expiresAt: number;
+    downloadCount: number;
+  }
+
+  const codeTransferStore = new Map<string, CodeTransferPackage>();
+
+  // Expire packages after 15 minutes
+  setInterval(() => {
+    const now = Date.now();
+    for (const [code, pkg] of codeTransferStore.entries()) {
+      if (now > pkg.expiresAt) {
+        codeTransferStore.delete(code);
+      }
+    }
+  }, 60000);
+
+  function generate6DigitCode(): string {
+    let code: string;
+    let attempts = 0;
+    do {
+      code = Math.floor(100000 + Math.random() * 900000).toString();
+      attempts++;
+    } while (codeTransferStore.has(code) && attempts < 100);
+    return code;
+  }
+
+  // 1. Upload files and generate 6-digit key
+  app.post('/api/code-transfer/create', (req: Request, res: Response) => {
+    try {
+      const { files, senderDeviceName } = req.body;
+      if (!files || !Array.isArray(files) || files.length === 0) {
+        return res.status(400).json({ error: 'Please provide at least one file to generate a code.' });
+      }
+
+      const totalSize = files.reduce((acc: number, f: any) => acc + (f.size || 0), 0);
+      if (totalSize > 50 * 1024 * 1024) {
+        return res.status(400).json({ error: 'Selected files exceed the 50MB limit for 6-digit code transfer.' });
+      }
+
+      const code = generate6DigitCode();
+      const now = Date.now();
+      const expiresAt = now + 15 * 60 * 1000;
+
+      const pkg: CodeTransferPackage = {
+        code,
+        senderDeviceName: senderDeviceName || 'Mobile / PC Device',
+        files: files.map((f: any) => ({
+          name: f.name || 'document',
+          size: f.size || 0,
+          type: f.type || 'application/octet-stream',
+          dataBase64: f.dataBase64 || '',
+        })),
+        totalSize,
+        filesCount: files.length,
+        createdAt: now,
+        expiresAt,
+        downloadCount: 0,
+      };
+
+      codeTransferStore.set(code, pkg);
+
+      return res.json({
+        success: true,
+        code,
+        formattedCode: `${code.slice(0, 3)} ${code.slice(3)}`,
+        expiresAt,
+        filesCount: pkg.filesCount,
+        totalSize: pkg.totalSize,
+        expiresInSeconds: 900,
+      });
+    } catch (err: any) {
+      console.error('[Code Transfer Error]:', err);
+      return res.status(500).json({ error: err.message || 'Failed to create code transfer' });
+    }
+  });
+
+  // 2. Lookup 6-digit transfer package info
+  app.get('/api/code-transfer/:code/info', (req: Request, res: Response) => {
+    try {
+      const rawCode = (req.params.code || '').replace(/\s+/g, '');
+      const pkg = codeTransferStore.get(rawCode);
+
+      if (!pkg) {
+        return res.status(404).json({ error: 'Transfer code not found or expired. Please check the 6 digits.' });
+      }
+
+      if (Date.now() > pkg.expiresAt) {
+        codeTransferStore.delete(rawCode);
+        return res.status(410).json({ error: 'This 6-digit transfer code has expired (15-minute validity limit).' });
+      }
+
+      return res.json({
+        success: true,
+        code: pkg.code,
+        formattedCode: `${pkg.code.slice(0, 3)} ${pkg.code.slice(3)}`,
+        senderDeviceName: pkg.senderDeviceName,
+        filesCount: pkg.filesCount,
+        totalSize: pkg.totalSize,
+        createdAt: pkg.createdAt,
+        expiresAt: pkg.expiresAt,
+        files: pkg.files.map((f) => ({
+          name: f.name,
+          size: f.size,
+          type: f.type,
+        })),
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 3. Retrieve files payload as JSON
+  app.get('/api/code-transfer/:code/payload', (req: Request, res: Response) => {
+    try {
+      const rawCode = (req.params.code || '').replace(/\s+/g, '');
+      const pkg = codeTransferStore.get(rawCode);
+
+      if (!pkg || Date.now() > pkg.expiresAt) {
+        return res.status(404).json({ error: 'Transfer code not found or expired.' });
+      }
+
+      pkg.downloadCount += 1;
+
+      return res.json({
+        success: true,
+        code: pkg.code,
+        senderDeviceName: pkg.senderDeviceName,
+        filesCount: pkg.filesCount,
+        totalSize: pkg.totalSize,
+        files: pkg.files,
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 4. Download file direct binary stream (or ZIP for groups of files)
+  app.get('/api/code-transfer/:code/download', async (req: Request, res: Response) => {
+    try {
+      const rawCode = (req.params.code || '').replace(/\s+/g, '');
+      const pkg = codeTransferStore.get(rawCode);
+
+      if (!pkg || Date.now() > pkg.expiresAt) {
+        return res.status(404).send('Transfer code expired or not found.');
+      }
+
+      pkg.downloadCount += 1;
+
+      if (pkg.files.length === 1) {
+        const file = pkg.files[0];
+        const base64Data = file.dataBase64.replace(/^data:[^;]+;base64,/, '');
+        const buffer = Buffer.from(base64Data, 'base64');
+
+        res.setHeader('Content-Type', file.type || 'application/octet-stream');
+        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(file.name)}"`);
+        res.setHeader('Content-Length', buffer.length);
+        return res.send(buffer);
+      } else {
+        const zip = new JSZip();
+        for (const file of pkg.files) {
+          const base64Data = file.dataBase64.replace(/^data:[^;]+;base64,/, '');
+          const buffer = Buffer.from(base64Data, 'base64');
+          zip.file(file.name, buffer);
+        }
+
+        const zipBuffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+        const zipName = `BeamDrop_Files_${pkg.code}.zip`;
+
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="${zipName}"`);
+        res.setHeader('Content-Length', zipBuffer.length);
+        return res.send(zipBuffer);
+      }
+    } catch (err: any) {
+      console.error('[Code Transfer Download Error]:', err);
+      return res.status(500).send(`Download failed: ${err.message}`);
     }
   });
 

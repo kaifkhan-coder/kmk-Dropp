@@ -18,12 +18,13 @@ import {
   ShieldCheck,
   Lock,
   FileText,
+  KeyRound,
 } from 'lucide-react';
 import { ThemeMode, UserSession } from '../types';
 
 interface HeaderProps {
-  currentTab: 'send' | 'receive' | 'messages' | 'users' | 'history' | 'security';
-  onSelectTab: (tab: 'send' | 'receive' | 'messages' | 'users' | 'history' | 'security') => void;
+  currentTab: 'send' | 'receive' | 'code' | 'messages' | 'users' | 'history' | 'security';
+  onSelectTab: (tab: 'send' | 'receive' | 'code' | 'messages' | 'users' | 'history' | 'security') => void;
   theme: ThemeMode;
   onToggleTheme: () => void;
   user: UserSession | null;
@@ -78,7 +79,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const handleTabClick = (tab: 'send' | 'receive' | 'messages' | 'users' | 'history' | 'security') => {
+  const handleTabClick = (tab: 'send' | 'receive' | 'code' | 'messages' | 'users' | 'history' | 'security') => {
     onSelectTab(tab);
     setMobileMenuOpen(false);
   };
@@ -179,6 +180,20 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             Send Files
+          </button>
+          <button
+            onClick={() => handleTabClick('code')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap ${
+              currentTab === 'code'
+                ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-950 shadow-xs'
+                : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:text-white dark:hover:bg-neutral-800/60'
+            }`}
+          >
+            <KeyRound className="h-3.5 w-3.5 text-indigo-500" />
+            <span>6-Digit Code</span>
+            <span className="rounded-full bg-indigo-500/10 px-1.5 py-0.5 text-[9px] font-bold text-indigo-600 dark:bg-indigo-400/20 dark:text-indigo-300">
+              Direct
+            </span>
           </button>
           <button
             onClick={() => handleTabClick('receive')}
@@ -343,6 +358,23 @@ export const Header: React.FC<HeaderProps> = ({
       {mobileMenuOpen && (
         <div className="lg:hidden border-t border-neutral-200 bg-white/95 px-4 py-3 dark:border-neutral-800 dark:bg-neutral-950/95 backdrop-blur-md animate-fade-in shadow-xl">
           <div className="grid grid-cols-2 gap-2 pb-2">
+            <button
+              onClick={() => handleTabClick('code')}
+              className={`col-span-2 flex items-center justify-between rounded-xl p-2.5 text-xs font-bold transition shadow-xs ${
+                currentTab === 'code'
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-indigo-50/90 text-indigo-900 border border-indigo-200 dark:bg-indigo-950/60 dark:text-indigo-200 dark:border-indigo-900/60'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <KeyRound className="h-4 w-4 text-indigo-500" />
+                <span>6-Digit Code Transfer</span>
+              </div>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/70 text-indigo-700 dark:bg-black/30 dark:text-indigo-300 font-semibold">
+                Instant Code
+              </span>
+            </button>
+
             <button
               onClick={() => handleTabClick('send')}
               className={`flex items-center gap-2 rounded-xl p-2.5 text-xs font-bold transition ${

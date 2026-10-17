@@ -67,7 +67,7 @@ async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey>
   const enc = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
     'raw',
-    enc.encode(password),
+    enc.encode(password) as unknown as BufferSource,
     'PBKDF2',
     false,
     ['deriveKey']
@@ -75,7 +75,7 @@ async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey>
   return crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
-      salt,
+      salt: salt as unknown as BufferSource,
       iterations: 100000,
       hash: 'SHA-256',
     },
@@ -99,9 +99,9 @@ async function encryptPayload(data: Uint8Array, password: string): Promise<{
   const key = await deriveKey(password, salt);
 
   const encryptedBuffer = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv },
+    { name: 'AES-GCM', iv: iv as unknown as BufferSource },
     key,
-    data
+    data as unknown as BufferSource
   );
 
   return {
@@ -125,9 +125,9 @@ async function decryptPayload(
   const key = await deriveKey(password, salt);
 
   const decryptedBuffer = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv },
+    { name: 'AES-GCM', iv: iv as unknown as BufferSource },
     key,
-    cipherData
+    cipherData as unknown as BufferSource
   );
 
   return new Uint8Array(decryptedBuffer);
@@ -600,7 +600,7 @@ export async function decodeDataFromImage(
   }
 
   // 5. Decrypt if encrypted
-  let clearBytes = payloadBytes;
+  let clearBytes: Uint8Array = payloadBytes;
   if (metadata.encrypted) {
     if (!password || !password.trim()) {
       throw new Error('This steganographic payload is encrypted with a passcode. Please enter the password.');
@@ -624,7 +624,7 @@ export async function decodeDataFromImage(
   // 7. Format output
   if (metadata.type === 'file') {
     const fileName = metadata.name || 'extracted_payload.bin';
-    const file = new File([clearBytes], fileName, { type: metadata.mimeType || 'application/octet-stream' });
+    const file = new File([clearBytes as unknown as BlobPart], fileName, { type: metadata.mimeType || 'application/octet-stream' });
     return {
       type: 'file',
       file,
