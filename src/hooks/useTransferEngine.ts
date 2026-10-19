@@ -26,6 +26,7 @@ import { detectDevice } from '../utils/format';
 import { safeLocalStorage, safeSessionStorage } from '../utils/storage';
 import { isSteganographyImage, decodeDataFromImage } from '../utils/steganography';
 import { soundFx } from '../utils/soundEffects';
+import { saveTransferToDB, getAllTransfersFromDB } from '../utils/indexedDBHistory';
 
 const CHUNK_SIZE = 32 * 1024; // 32 KB per chunk (iOS Safari & multi-device buffer safe)
 const ICE_SERVERS: RTCIceServer[] = [
@@ -249,21 +250,39 @@ export function useTransferEngine(initialRoomId?: string, initialKeyBase64?: str
   const cancelTransferRef = useRef(false);
   const pauseTransferRef = useRef(false);
 
-  // Sync history to local storage
+  // Auto-Save transfer history to Local IndexedDB (Zero Login Required, persistent across refreshes)
   const addToHistory = useCallback((item: Omit<TransferHistoryItem, 'id'>) => {
     const newItem: TransferHistoryItem = {
       ...item,
       id: generateUUID(),
     };
     setHistory((prev) => {
-      const updated = [newItem, ...prev.slice(0, 49)];
+      const updated = [newItem, ...prev.slice(0, 99)];
       try {
         safeLocalStorage.setItem('beamdrop_history', JSON.stringify(updated));
       } catch {
-        // quota exceeded fallback
+        // quota fallback
       }
       return updated;
     });
+
+    // Save asynchronously to client IndexedDB database
+    saveTransferToDB(newItem).catch((err) => {
+      console.warn('[IndexedDB] History auto-save failed:', err);
+    });
+  }, []);
+
+  // Load persistent history from IndexedDB on startup
+  useEffect(() => {
+    getAllTransfersFromDB()
+      .then((records) => {
+        if (records && records.length > 0) {
+          setHistory(records);
+        }
+      })
+      .catch((err) => {
+        console.warn('[IndexedDB] Initial load skipped:', err);
+      });
   }, []);
 
   // 1. Initialize or load End-to-End Encryption Key

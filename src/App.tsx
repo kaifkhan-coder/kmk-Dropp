@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   ShieldCheck,
   Smartphone,
@@ -17,6 +18,9 @@ import {
   Sparkles,
   Wifi,
   KeyRound,
+  Send,
+  History as HistoryIcon,
+  Layers,
 } from 'lucide-react';
 import { Header } from './components/Header';
 import { CodeTransferSection } from './components/CodeTransferSection';
@@ -46,6 +50,8 @@ import { IOSSmartBanner } from './components/IOSSmartBanner';
 import { SteganographyStudioModal } from './components/SteganographyStudioModal';
 import { StegoReceiverCard } from './components/StegoReceiverCard';
 import { AnimatedTransferBeam } from './components/AnimatedTransferBeam';
+import { SmartDragOverlay } from './components/SmartDragOverlay';
+import { QueueManager } from './components/QueueManager';
 import { usePWAInstall } from './hooks/usePWAInstall';
 import { useTransferEngine } from './hooks/useTransferEngine';
 import { ThemeMode, UserSession, ReceivedFileItem, AdminSession, ScannedQRConnection } from './types';
@@ -63,6 +69,7 @@ export default function App() {
   // Current active navigation tab
   const [currentTab, setCurrentTab] = useState<'send' | 'code' | 'receive' | 'messages' | 'users' | 'history'>('send');
   const [initialCodeParam, setInitialCodeParam] = useState<string>('');
+  const [codeTransferInitialMode, setCodeTransferInitialMode] = useState<'send' | 'receive'>('send');
 
   // Check URL parameters for 6-digit code or direct code tab
   useEffect(() => {
@@ -74,6 +81,7 @@ export default function App() {
         const clean = code.trim().replace(/\D/g, '').slice(0, 6);
         if (clean.length === 6) {
           setInitialCodeParam(clean);
+          setCodeTransferInitialMode('receive');
           setCurrentTab('code');
         }
       } else if (tab === 'code' || window.location.hash.includes('code-transfer')) {
@@ -90,7 +98,8 @@ export default function App() {
   const [isAdminLoginOpen, setIsAdminLoginOpen] = useState(false);
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
   const [isForcedFeedbackOpen, setIsForcedFeedbackOpen] = useState(false);
-  const [previewFile, setPreviewFile] = useState<ReceivedFileItem | null>(null);
+  const [previewFile, setPreviewFile] = useState<ReceivedFileItem | File | null>(null);
+  const [transferViewMode, setTransferViewMode] = useState<'standard' | 'queue'>('standard');
   const [isDeviceNameModalOpen, setIsDeviceNameModalOpen] = useState(false);
 
   // Universal Watermarking Modal State (All Files: PDFs, Images, Docs, Text)
@@ -397,6 +406,41 @@ export default function App() {
       if (deviceName && deviceName.trim()) {
         updateMyDeviceName(deviceName.trim());
       }
+
+      // Check if scanned QR is a 6-Digit Transfer Code
+      if (scannedUrl.includes('code=')) {
+        try {
+          const urlObj = new URL(scannedUrl.startsWith('http') ? scannedUrl : `https://dummy.local/${scannedUrl}`);
+          const codeVal = urlObj.searchParams.get('code') || '';
+          const clean = codeVal.replace(/\D/g, '').slice(0, 6);
+          if (clean.length === 6) {
+            setInitialCodeParam(clean);
+            setCodeTransferInitialMode('receive');
+            setCurrentTab('code');
+            setIsScannerOpen(false);
+            return;
+          }
+        } catch {}
+      }
+
+      const codeUrlMatch = scannedUrl.match(/\/c\/(\d{6})/);
+      if (codeUrlMatch && codeUrlMatch[1]) {
+        setInitialCodeParam(codeUrlMatch[1]);
+        setCodeTransferInitialMode('receive');
+        setCurrentTab('code');
+        setIsScannerOpen(false);
+        return;
+      }
+
+      const rawNumeric = scannedUrl.trim().replace(/\D/g, '');
+      if (rawNumeric.length === 6 && /^\d{6}$/.test(scannedUrl.trim())) {
+        setInitialCodeParam(rawNumeric);
+        setCodeTransferInitialMode('receive');
+        setCurrentTab('code');
+        setIsScannerOpen(false);
+        return;
+      }
+
       let targetRoom = '';
       if (scannedUrl.includes('room=')) {
         const urlObj = new URL(scannedUrl.startsWith('http') ? scannedUrl : `https://dummy.local/${scannedUrl}`);
@@ -467,6 +511,9 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-900 transition-colors dark:bg-[#0a0a0a] dark:text-neutral-100 flex flex-col justify-between selection:bg-neutral-900 selection:text-white dark:selection:bg-white dark:selection:text-neutral-950 font-sans">
+      {/* Smart Drag-Over Fullscreen Interactive Overlay */}
+      <SmartDragOverlay onDropFiles={handleFilesSelected} />
+
       {/* Top Header */}
       <Header
         theme={theme}
@@ -509,7 +556,7 @@ export default function App() {
         isInstalled={isInstalled}
       />
 
-      <main className="mx-auto max-w-6xl px-4 py-8 w-full flex-1 space-y-8">
+      <main className="mx-auto max-w-6xl px-3 sm:px-6 lg:px-8 py-6 sm:py-8 w-full flex-1 space-y-8 pb-24 lg:pb-8">
         {/* Animated Cyber Transfer Bridge between PC and Mobile */}
         <AnimatedTransferBeam
           progress={currentTransfer}
@@ -713,38 +760,94 @@ export default function App() {
             <div id="file-drop-area" className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
               {/* Left Column: File Drop & Selection (8 cols) */}
               <div className="lg:col-span-7 space-y-6">
-                <FileDropZone
-                  selectedFiles={selectedFiles}
-                  onFilesSelected={handleFilesSelected}
-                  onRemoveFile={handleRemoveFile}
-                  onClearFiles={handleClearFiles}
-                  onStartTransfer={handleStartTransfer}
-                  isPeerConnected={peers.length > 0}
-                  peers={peers}
-                  onOpenQR={() => {
-                    const qrEl = document.getElementById('qr-code-section');
-                    qrEl?.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                  isSignedIn={Boolean(user)}
-                  onRequireAuth={() => setIsAuthOpen(true)}
-                  isPaid={isPaid}
-                  onOpenWatermark={handleOpenWatermarkModal}
-                  onOpenConverter={(file) => {
-                    setConverterTargetFile(file || null);
-                    setIsConverterOpen(true);
-                  }}
-                  onOpenSteganography={(file) => {
-                    setStegoTargetFile(file || null);
-                    setIsStegoModalOpen(true);
-                  }}
-                  onOpenAIAnalyze={(file) => {
-                    setAIAnalyzerTargetFile(file || selectedFiles[0] || null);
-                    setIsAIAnalyzerOpen(true);
-                  }}
-                  history={history}
-                  currentTransfer={currentTransfer}
-                  onOpenCodeTransfer={() => setCurrentTab('code')}
-                />
+                {/* View Switcher: Standard Drop Zone vs. Multi-Device Queue Manager */}
+                <div className="flex items-center justify-between p-1.5 rounded-2xl bg-neutral-100 dark:bg-neutral-800/80 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setTransferViewMode('standard')}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl transition font-semibold cursor-pointer ${
+                      transferViewMode === 'standard'
+                        ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-xs font-bold'
+                        : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
+                    }`}
+                  >
+                    <Upload className="h-3.5 w-3.5" />
+                    <span>Drop Zone</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTransferViewMode('queue')}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl transition font-semibold cursor-pointer ${
+                      transferViewMode === 'queue'
+                        ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-xs font-bold'
+                        : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
+                    }`}
+                  >
+                    <Layers className="h-3.5 w-3.5" />
+                    <span>Multi-Device Queue Manager {selectedFiles.length > 0 ? `(${selectedFiles.length})` : ''}</span>
+                  </button>
+                </div>
+
+                {transferViewMode === 'queue' ? (
+                  <QueueManager
+                    files={selectedFiles}
+                    peers={peers}
+                    onRemoveFile={handleRemoveFile}
+                    onClearFiles={handleClearFiles}
+                    onAddMoreFiles={() => {
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.multiple = true;
+                      input.onchange = (e: any) => {
+                        if (e.target.files) handleFilesSelected(Array.from(e.target.files));
+                      };
+                      input.click();
+                    }}
+                    onPreviewFile={(file) => setPreviewFile(file)}
+                    onOpenQRScanner={() => setIsScannerOpen(true)}
+                    onOpenQRModal={() => {
+                      const qrEl = document.getElementById('qr-code-section');
+                      qrEl?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    myDeviceName={myDevice.name}
+                    isP2PConnected={isP2PConnected}
+                  />
+                ) : (
+                  <FileDropZone
+                    selectedFiles={selectedFiles}
+                    onFilesSelected={handleFilesSelected}
+                    onRemoveFile={handleRemoveFile}
+                    onClearFiles={handleClearFiles}
+                    onStartTransfer={handleStartTransfer}
+                    isPeerConnected={peers.length > 0}
+                    peers={peers}
+                    onOpenQR={() => {
+                      const qrEl = document.getElementById('qr-code-section');
+                      qrEl?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    isSignedIn={Boolean(user)}
+                    onRequireAuth={() => setIsAuthOpen(true)}
+                    isPaid={isPaid}
+                    onOpenWatermark={handleOpenWatermarkModal}
+                    onOpenConverter={(file) => {
+                      setConverterTargetFile(file || null);
+                      setIsConverterOpen(true);
+                    }}
+                    onOpenSteganography={(file) => {
+                      setStegoTargetFile(file || null);
+                      setIsStegoModalOpen(true);
+                    }}
+                    onOpenAIAnalyze={(file) => {
+                      setAIAnalyzerTargetFile(file || selectedFiles[0] || null);
+                      setIsAIAnalyzerOpen(true);
+                    }}
+                    history={history}
+                    currentTransfer={currentTransfer}
+                    onOpenCodeTransfer={() => setCurrentTab('code')}
+                    onPreviewFile={(file) => setPreviewFile(file)}
+                    onOpenQueueManager={() => setTransferViewMode('queue')}
+                  />
+                )}
 
                 {/* Recently Received in this Session */}
                 {receivedFiles.length > 0 && (
@@ -850,11 +953,12 @@ export default function App() {
             <CodeTransferSection
               myDeviceName={myDevice.name}
               initialCode={initialCodeParam}
-              initialMode={initialCodeParam ? 'receive' : 'send'}
+              initialMode={initialCodeParam ? 'receive' : codeTransferInitialMode}
               onFileDownloaded={(fileName, fileSize) => {
                 // Keep track of download
               }}
               onSwitchToSendTab={() => setCurrentTab('send')}
+              onOpenQRScanner={() => setIsScannerOpen(true)}
             />
           </div>
         )}
@@ -881,7 +985,10 @@ export default function App() {
                 </div>
               </div>
               <button
-                onClick={() => setCurrentTab('code')}
+                onClick={() => {
+                  setCodeTransferInitialMode('receive');
+                  setCurrentTab('code');
+                }}
                 className="flex items-center gap-1.5 shrink-0 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-indigo-500 transition whitespace-nowrap cursor-pointer"
               >
                 <span>Enter 6-Digit Code</span>
@@ -1083,13 +1190,12 @@ export default function App() {
           />
         )}
 
-        {/* TAB 4: TRANSFER HISTORY (Strictly available to logged-in users) */}
+        {/* TAB 4: TRANSFER HISTORY (Auto-Saved in Local IndexedDB, Zero Login Required) */}
         {currentTab === 'history' && (
           <TransferHistoryView
             history={history}
             onClearHistory={() => {
               safeLocalStorage.removeItem('beamdrop_history');
-              window.location.reload();
             }}
             isSignedIn={Boolean(user)}
             onRequireAuth={() => setIsAuthOpen(true)}
@@ -1289,7 +1395,7 @@ export default function App() {
       {!isChatbotOpen && (
         <button
           onClick={() => setIsChatbotOpen(true)}
-          className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 px-4 py-3 text-xs font-bold text-white shadow-xl hover:from-indigo-500 hover:to-purple-500 hover:shadow-2xl transition active:scale-95 group"
+          className="fixed bottom-20 lg:bottom-6 right-4 sm:right-6 z-40 flex items-center gap-2 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 px-3.5 py-2.5 sm:px-4 sm:py-3 text-xs font-bold text-white shadow-xl hover:from-indigo-500 hover:to-purple-500 hover:shadow-2xl transition active:scale-95 group cursor-pointer"
           title="Open BeamDrop AI Assistant"
         >
           <div className="relative">
@@ -1297,9 +1403,119 @@ export default function App() {
             <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
             <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-emerald-400" />
           </div>
-          <span>BeamDrop AI Help</span>
+          <span className="hidden xs:inline">BeamDrop AI Help</span>
         </button>
       )}
+
+      {/* Mobile Floating Glass Dock (Visible only on mobile/tablet) */}
+      <nav aria-label="Mobile Navigation" className="lg:hidden fixed bottom-3 left-3 right-3 z-40 rounded-2xl bg-white/92 dark:bg-neutral-950/92 backdrop-blur-xl border border-neutral-200/80 dark:border-neutral-800/80 shadow-2xl p-1.5 flex items-center justify-around">
+        <button
+          type="button"
+          onClick={() => setCurrentTab('send')}
+          className={`relative flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition cursor-pointer active:scale-95 ${
+            currentTab === 'send'
+              ? 'text-indigo-600 dark:text-indigo-400 font-bold'
+              : 'text-neutral-500 dark:text-neutral-400'
+          }`}
+        >
+          {currentTab === 'send' && (
+            <motion.div
+              layoutId="mobile-dock-active"
+              className="absolute inset-0 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 shadow-xs"
+              transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+            />
+          )}
+          <Send className="relative z-10 h-4 w-4" />
+          <span className="relative z-10 text-[10px] mt-0.5">Send</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setCurrentTab('code')}
+          className={`relative flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition cursor-pointer active:scale-95 ${
+            currentTab === 'code'
+              ? 'text-indigo-600 dark:text-indigo-400 font-bold'
+              : 'text-neutral-500 dark:text-neutral-400'
+          }`}
+        >
+          {currentTab === 'code' && (
+            <motion.div
+              layoutId="mobile-dock-active"
+              className="absolute inset-0 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 shadow-xs"
+              transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+            />
+          )}
+          <KeyRound className="relative z-10 h-4 w-4" />
+          <span className="relative z-10 text-[10px] mt-0.5">6-Digit</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setCurrentTab('receive')}
+          className={`relative flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition cursor-pointer active:scale-95 ${
+            currentTab === 'receive'
+              ? 'text-indigo-600 dark:text-indigo-400 font-bold'
+              : 'text-neutral-500 dark:text-neutral-400'
+          }`}
+        >
+          {currentTab === 'receive' && (
+            <motion.div
+              layoutId="mobile-dock-active"
+              className="absolute inset-0 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 shadow-xs"
+              transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+            />
+          )}
+          <Download className="relative z-10 h-4 w-4" />
+          <span className="relative z-10 text-[10px] mt-0.5">Receive</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setCurrentTab('messages')}
+          className={`relative flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition cursor-pointer active:scale-95 ${
+            currentTab === 'messages'
+              ? 'text-indigo-600 dark:text-indigo-400 font-bold'
+              : 'text-neutral-500 dark:text-neutral-400'
+          }`}
+        >
+          {currentTab === 'messages' && (
+            <motion.div
+              layoutId="mobile-dock-active"
+              className="absolute inset-0 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 shadow-xs"
+              transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+            />
+          )}
+          <div className="relative z-10">
+            <MessageSquare className="h-4 w-4" />
+            {textMessages.filter((m) => m.direction === 'received').length > 0 && (
+              <span className="absolute -top-1 -right-1.5 flex h-3 w-3 items-center justify-center rounded-full bg-rose-500 text-[8px] font-bold text-white">
+                {textMessages.filter((m) => m.direction === 'received').length}
+              </span>
+            )}
+          </div>
+          <span className="relative z-10 text-[10px] mt-0.5">Text</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setCurrentTab('history')}
+          className={`relative flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition cursor-pointer active:scale-95 ${
+            currentTab === 'history'
+              ? 'text-indigo-600 dark:text-indigo-400 font-bold'
+              : 'text-neutral-500 dark:text-neutral-400'
+          }`}
+        >
+          {currentTab === 'history' && (
+            <motion.div
+              layoutId="mobile-dock-active"
+              className="absolute inset-0 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 shadow-xs"
+              transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+            />
+          )}
+          <HistoryIcon className="relative z-10 h-4 w-4" />
+          <span className="relative z-10 text-[10px] mt-0.5">History</span>
+        </button>
+      </nav>
 
       {/* Minimal Footer */}
       <footer className="mt-16 border-t border-neutral-200/80 py-8 text-center text-xs text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">

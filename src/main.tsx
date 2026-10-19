@@ -4,12 +4,27 @@ import App from './App.tsx';
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 import './index.css';
 
-// Register PWA service worker for iOS & offline capabilities
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
+// Register PWA service worker for offline resilience & fast asset caching
+if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch((err) => {
-      console.warn('SW registration skipped:', err);
-    });
+    navigator.serviceWorker
+      .register('/sw.js')
+      .then((reg) => {
+        // Check for updates
+        reg.onupdatefound = () => {
+          const installingWorker = reg.installing;
+          if (installingWorker) {
+            installingWorker.onstatechange = () => {
+              if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                // New content is available
+              }
+            };
+          }
+        };
+      })
+      .catch((err) => {
+        console.warn('SW registration skipped:', err);
+      });
   });
 }
 

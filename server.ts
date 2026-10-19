@@ -1753,8 +1753,9 @@ async function bootstrap() {
   }
 
   const codeTransferStore = new Map<string, CodeTransferPackage>();
+  const CODE_TTL_MS = 5 * 60 * 1000; // 5 Minutes (strictly between 2 to 5 minutes for security & reliability)
 
-  // Expire packages after 15 minutes
+  // Active Eviction: clean up expired codes every 15 seconds so server RAM never leaks
   setInterval(() => {
     const now = Date.now();
     for (const [code, pkg] of codeTransferStore.entries()) {
@@ -1762,7 +1763,7 @@ async function bootstrap() {
         codeTransferStore.delete(code);
       }
     }
-  }, 60000);
+  }, 15000);
 
   function generate6DigitCode(): string {
     let code: string;
@@ -1774,7 +1775,13 @@ async function bootstrap() {
     return code;
   }
 
-  // 1. Upload files and generate 6-digit key
+  // Short URL Direct Redirect: site.com/c/123456 -> opens directly on mobile or PC
+  app.get('/c/:code', (req: Request, res: Response) => {
+    const rawCode = (req.params.code || '').replace(/\D/g, '').slice(0, 6);
+    return res.redirect(`/?code=${rawCode}#code-transfer`);
+  });
+
+  // 1. Upload files and generate 6-digit key (Auto-expiring in 5 minutes)
   app.post('/api/code-transfer/create', (req: Request, res: Response) => {
     try {
       const { files, senderDeviceName } = req.body;
@@ -1789,7 +1796,7 @@ async function bootstrap() {
 
       const code = generate6DigitCode();
       const now = Date.now();
-      const expiresAt = now + 15 * 60 * 1000;
+      const expiresAt = now + CODE_TTL_MS;
 
       const pkg: CodeTransferPackage = {
         code,
@@ -1816,7 +1823,7 @@ async function bootstrap() {
         expiresAt,
         filesCount: pkg.filesCount,
         totalSize: pkg.totalSize,
-        expiresInSeconds: 900,
+        expiresInSeconds: 300, // 5 minutes validity
       });
     } catch (err: any) {
       console.error('[Code Transfer Error]:', err);
@@ -1827,7 +1834,7 @@ async function bootstrap() {
   // 2. Lookup 6-digit transfer package info
   app.get('/api/code-transfer/:code/info', (req: Request, res: Response) => {
     try {
-      const rawCode = (req.params.code || '').replace(/\s+/g, '');
+      const rawCode = (req.params.code || '').replace(/\D/g, '').slice(0, 6);
       const pkg = codeTransferStore.get(rawCode);
 
       if (!pkg) {
@@ -1836,7 +1843,7 @@ async function bootstrap() {
 
       if (Date.now() > pkg.expiresAt) {
         codeTransferStore.delete(rawCode);
-        return res.status(410).json({ error: 'This 6-digit transfer code has expired (15-minute validity limit).' });
+        return res.status(410).json({ error: 'This 6-digit transfer code has expired (5-minute auto-expiry for security).' });
       }
 
       return res.json({
@@ -1862,7 +1869,7 @@ async function bootstrap() {
   // 3. Retrieve files payload as JSON
   app.get('/api/code-transfer/:code/payload', (req: Request, res: Response) => {
     try {
-      const rawCode = (req.params.code || '').replace(/\s+/g, '');
+      const rawCode = (req.params.code || '').replace(/\D/g, '').slice(0, 6);
       const pkg = codeTransferStore.get(rawCode);
 
       if (!pkg || Date.now() > pkg.expiresAt) {
@@ -1887,7 +1894,7 @@ async function bootstrap() {
   // 4. Download file direct binary stream (or ZIP for groups of files)
   app.get('/api/code-transfer/:code/download', async (req: Request, res: Response) => {
     try {
-      const rawCode = (req.params.code || '').replace(/\s+/g, '');
+      const rawCode = (req.params.code || '').replace(/\D/g, '').slice(0, 6);
       const pkg = codeTransferStore.get(rawCode);
 
       if (!pkg || Date.now() > pkg.expiresAt) {

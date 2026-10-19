@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   Sun,
   Moon,
@@ -170,66 +171,109 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Middle Section: Desktop Nav Tabs (Hidden on small screens) */}
-        <nav className="hidden lg:flex items-center gap-1">
+        <nav className="hidden lg:flex items-center gap-1 bg-neutral-100/80 dark:bg-neutral-900/80 p-1 rounded-xl border border-neutral-200/60 dark:border-neutral-800/60">
           <button
             onClick={() => handleTabClick('send')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap ${
+            className={`relative px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap cursor-pointer ${
               currentTab === 'send'
-                ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-950'
-                : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:text-white dark:hover:bg-neutral-800/60'
+                ? 'text-white dark:text-neutral-950 font-bold'
+                : 'text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
             }`}
           >
-            Send Files
+            {currentTab === 'send' && (
+              <motion.div
+                layoutId="header-nav-indicator"
+                className="absolute inset-0 rounded-lg bg-neutral-900 dark:bg-white shadow-xs"
+                transition={{ type: 'spring', stiffness: 450, damping: 35 }}
+              />
+            )}
+            <span className="relative z-10">Send Files</span>
           </button>
+
           <button
             onClick={() => handleTabClick('code')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap ${
+            className={`relative flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap cursor-pointer ${
               currentTab === 'code'
-                ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-950 shadow-xs'
-                : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:text-white dark:hover:bg-neutral-800/60'
+                ? 'text-white dark:text-neutral-950 font-bold'
+                : 'text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
             }`}
           >
-            <KeyRound className="h-3.5 w-3.5 text-indigo-500" />
-            <span>6-Digit Code</span>
-            <span className="rounded-full bg-indigo-500/10 px-1.5 py-0.5 text-[9px] font-bold text-indigo-600 dark:bg-indigo-400/20 dark:text-indigo-300">
+            {currentTab === 'code' && (
+              <motion.div
+                layoutId="header-nav-indicator"
+                className="absolute inset-0 rounded-lg bg-neutral-900 dark:bg-white shadow-xs"
+                transition={{ type: 'spring', stiffness: 450, damping: 35 }}
+              />
+            )}
+            <KeyRound className={`relative z-10 h-3.5 w-3.5 ${currentTab === 'code' ? 'text-indigo-300 dark:text-indigo-600' : 'text-indigo-500'}`} />
+            <span className="relative z-10">6-Digit Code</span>
+            <span className={`relative z-10 rounded-full px-1.5 py-0.2 text-[9px] font-bold ${
+              currentTab === 'code'
+                ? 'bg-white/20 text-white dark:bg-black/10 dark:text-neutral-950'
+                : 'bg-indigo-500/10 text-indigo-600 dark:bg-indigo-400/20 dark:text-indigo-300'
+            }`}>
               Direct
             </span>
           </button>
+
           <button
             onClick={() => handleTabClick('receive')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap ${
+            className={`relative px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap cursor-pointer ${
               currentTab === 'receive'
-                ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-950'
-                : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:text-white dark:hover:bg-neutral-800/60'
+                ? 'text-white dark:text-neutral-950 font-bold'
+                : 'text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
             }`}
           >
-            Receive / Pair
+            {currentTab === 'receive' && (
+              <motion.div
+                layoutId="header-nav-indicator"
+                className="absolute inset-0 rounded-lg bg-neutral-900 dark:bg-white shadow-xs"
+                transition={{ type: 'spring', stiffness: 450, damping: 35 }}
+              />
+            )}
+            <span className="relative z-10">Receive / Pair</span>
           </button>
+
           <button
             onClick={() => handleTabClick('messages')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap ${
+            className={`relative flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap cursor-pointer ${
               currentTab === 'messages'
-                ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-950'
-                : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:text-white dark:hover:bg-neutral-800/60'
+                ? 'text-white dark:text-neutral-950 font-bold'
+                : 'text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
             }`}
           >
-            <span>Text</span>
+            {currentTab === 'messages' && (
+              <motion.div
+                layoutId="header-nav-indicator"
+                className="absolute inset-0 rounded-lg bg-neutral-900 dark:bg-white shadow-xs"
+                transition={{ type: 'spring', stiffness: 450, damping: 35 }}
+              />
+            )}
+            <span className="relative z-10">Text</span>
             {unreadMessagesCount > 0 && (
-              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white">
+              <span className="relative z-10 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white">
                 {unreadMessagesCount}
               </span>
             )}
           </button>
+
           <button
             onClick={() => handleTabClick('history')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap ${
+            className={`relative flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap cursor-pointer ${
               currentTab === 'history'
-                ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-950'
-                : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:text-white dark:hover:bg-neutral-800/60'
+                ? 'text-white dark:text-neutral-950 font-bold'
+                : 'text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
             }`}
           >
-            <span>History</span>
-            {!user && <Lock className="h-3 w-3 text-neutral-400" />}
+            {currentTab === 'history' && (
+              <motion.div
+                layoutId="header-nav-indicator"
+                className="absolute inset-0 rounded-lg bg-neutral-900 dark:bg-white shadow-xs"
+                transition={{ type: 'spring', stiffness: 450, damping: 35 }}
+              />
+            )}
+            <span className="relative z-10">History</span>
+            {!user && <Lock className="relative z-10 h-3 w-3 text-neutral-400" />}
           </button>
           {onOpenConverter && (
             <button
@@ -355,180 +399,188 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Mobile Drawer Menu (Visible when hamburger opened on mobile/tablet) */}
-      {mobileMenuOpen && (
-        <div className="lg:hidden border-t border-neutral-200 bg-white/95 px-4 py-3 dark:border-neutral-800 dark:bg-neutral-950/95 backdrop-blur-md animate-fade-in shadow-xl">
-          <div className="grid grid-cols-2 gap-2 pb-2">
-            <button
-              onClick={() => handleTabClick('code')}
-              className={`col-span-2 flex items-center justify-between rounded-xl p-2.5 text-xs font-bold transition shadow-xs ${
-                currentTab === 'code'
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-indigo-50/90 text-indigo-900 border border-indigo-200 dark:bg-indigo-950/60 dark:text-indigo-200 dark:border-indigo-900/60'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <KeyRound className="h-4 w-4 text-indigo-500" />
-                <span>6-Digit Code Transfer</span>
-              </div>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/70 text-indigo-700 dark:bg-black/30 dark:text-indigo-300 font-semibold">
-                Instant Code
-              </span>
-            </button>
-
-            <button
-              onClick={() => handleTabClick('send')}
-              className={`flex items-center gap-2 rounded-xl p-2.5 text-xs font-bold transition ${
-                currentTab === 'send'
-                  ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-950'
-                  : 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300'
-              }`}
-            >
-              <Send className="h-3.5 w-3.5" />
-              <span>Send Files</span>
-            </button>
-
-            <button
-              onClick={() => handleTabClick('receive')}
-              className={`flex items-center gap-2 rounded-xl p-2.5 text-xs font-bold transition ${
-                currentTab === 'receive'
-                  ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-950'
-                  : 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300'
-              }`}
-            >
-              <Download className="h-3.5 w-3.5" />
-              <span>Receive / Pair</span>
-            </button>
-
-            <button
-              onClick={() => handleTabClick('messages')}
-              className={`flex items-center gap-2 rounded-xl p-2.5 text-xs font-bold transition ${
-                currentTab === 'messages'
-                  ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-950'
-                  : 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300'
-              }`}
-            >
-              <MessageSquare className="h-3.5 w-3.5" />
-              <span>Text / Clipboard</span>
-              {unreadMessagesCount > 0 && (
-                <span className="ml-auto rounded-full bg-rose-500 px-1.5 py-0.2 text-[9px] font-bold text-white">
-                  {unreadMessagesCount}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, height: 0, y: -8 }}
+            animate={{ opacity: 1, height: 'auto', y: 0 }}
+            exit={{ opacity: 0, height: 0, y: -8 }}
+            transition={{ type: 'spring', damping: 28, stiffness: 350 }}
+            className="lg:hidden overflow-hidden border-t border-neutral-200 bg-white/95 px-4 py-3 dark:border-neutral-800 dark:bg-neutral-950/95 backdrop-blur-md shadow-xl"
+          >
+            <div className="grid grid-cols-2 gap-2 pb-2">
+              <button
+                onClick={() => handleTabClick('code')}
+                className={`col-span-2 flex items-center justify-between rounded-xl p-2.5 text-xs font-bold transition shadow-xs active:scale-[0.98] ${
+                  currentTab === 'code'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-indigo-50/90 text-indigo-900 border border-indigo-200 dark:bg-indigo-950/60 dark:text-indigo-200 dark:border-indigo-900/60'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <KeyRound className="h-4 w-4 text-indigo-500" />
+                  <span>6-Digit Code Transfer</span>
+                </div>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/70 text-indigo-700 dark:bg-black/30 dark:text-indigo-300 font-semibold">
+                  Instant Code
                 </span>
-              )}
-            </button>
-
-            <button
-              onClick={() => handleTabClick('history')}
-              className={`flex items-center gap-2 rounded-xl p-2.5 text-xs font-bold transition ${
-                currentTab === 'history'
-                  ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-950'
-                  : 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300'
-              }`}
-            >
-              <History className="h-3.5 w-3.5" />
-              <span>History</span>
-              {!user && <Lock className="ml-auto h-3 w-3 text-amber-500" />}
-            </button>
-
-            {onOpenConverter && (
-              <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  onOpenConverter();
-                }}
-                className="flex items-center gap-2 rounded-xl p-2.5 text-xs font-bold bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
-              >
-                <FileText className="h-3.5 w-3.5 text-indigo-500" />
-                <span>Document Converter (PDF ⇄ Word, Text, Image)</span>
               </button>
-            )}
 
-            {onOpenChatbot && (
               <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  onOpenChatbot();
-                }}
-                className="flex items-center gap-2 rounded-xl p-2.5 text-xs font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300"
+                onClick={() => handleTabClick('send')}
+                className={`flex items-center gap-2 rounded-xl p-2.5 text-xs font-bold transition active:scale-[0.98] ${
+                  currentTab === 'send'
+                    ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-950'
+                    : 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300'
+                }`}
               >
-                <Sparkles className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
-                <span>BeamDrop AI Assistant (Q&A)</span>
+                <Send className="h-3.5 w-3.5" />
+                <span>Send Files</span>
               </button>
-            )}
 
-            {onOpenSteganography && (
               <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  onOpenSteganography();
-                }}
-                className="flex items-center gap-2 rounded-xl p-2.5 text-xs font-semibold text-cyan-800 bg-cyan-50 dark:bg-cyan-950/40 dark:text-cyan-300"
+                onClick={() => handleTabClick('receive')}
+                className={`flex items-center gap-2 rounded-xl p-2.5 text-xs font-bold transition active:scale-[0.98] ${
+                  currentTab === 'receive'
+                    ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-950'
+                    : 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300'
+                }`}
               >
-                <Shield className="h-3.5 w-3.5 text-cyan-600 dark:text-cyan-400" />
-                <span>Steganography Studio (Hide & Reveal)</span>
+                <Download className="h-3.5 w-3.5" />
+                <span>Receive / Pair</span>
               </button>
-            )}
 
-            {onOpenIOSLaunch && (
               <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  onOpenIOSLaunch();
-                }}
-                className="flex items-center gap-2 rounded-xl p-2.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                onClick={() => handleTabClick('messages')}
+                className={`flex items-center gap-2 rounded-xl p-2.5 text-xs font-bold transition active:scale-[0.98] ${
+                  currentTab === 'messages'
+                    ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-950'
+                    : 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300'
+                }`}
               >
-                <Smartphone className="h-3.5 w-3.5 text-indigo-500" />
-                <span>Launch on iOS (Add to Home Screen)</span>
+                <MessageSquare className="h-3.5 w-3.5" />
+                <span>Text / Clipboard</span>
+                {unreadMessagesCount > 0 && (
+                  <span className="ml-auto rounded-full bg-rose-500 px-1.5 py-0.2 text-[9px] font-bold text-white">
+                    {unreadMessagesCount}
+                  </span>
+                )}
               </button>
-            )}
-          </div>
 
-          <div className="flex items-center justify-between border-t border-neutral-100 pt-2.5 dark:border-neutral-800">
-            {onOpenPayment ? (
               <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  onOpenPayment();
-                }}
-                className="flex items-center gap-1.5 text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white"
+                onClick={() => handleTabClick('history')}
+                className={`flex items-center gap-2 rounded-xl p-2.5 text-xs font-bold transition active:scale-[0.98] ${
+                  currentTab === 'history'
+                    ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-950'
+                    : 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300'
+                }`}
               >
-                <Lock className="h-3.5 w-3.5 text-indigo-500" />
-                <span>{isPaid ? 'E2EE Active' : `Unlock E2EE (₹${e2eePrice})`}</span>
+                <History className="h-3.5 w-3.5" />
+                <span>History</span>
+                {!user && <Lock className="ml-auto h-3 w-3 text-amber-500" />}
               </button>
-            ) : <div />}
 
-            {onOpenAdmin && (
-              <div className="flex items-center gap-2">
+              {onOpenConverter && (
                 <button
-                  type="button"
                   onClick={() => {
                     setMobileMenuOpen(false);
-                    onOpenAdmin();
+                    onOpenConverter();
                   }}
-                  className="flex items-center gap-1.5 text-xs font-bold text-amber-600 dark:text-amber-400"
+                  className="flex items-center gap-2 rounded-xl p-2.5 text-xs font-bold bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 active:scale-[0.98]"
                 >
-                  <Shield className="h-3.5 w-3.5" />
-                  <span>{isAdminAuthenticated ? 'Admin Panel' : 'Admin Console'}</span>
+                  <FileText className="h-3.5 w-3.5 text-indigo-500" />
+                  <span>Document Converter</span>
                 </button>
+              )}
 
-                {isAdminAuthenticated && onAdminLogout && (
+              {onOpenChatbot && (
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    onOpenChatbot();
+                  }}
+                  className="flex items-center gap-2 rounded-xl p-2.5 text-xs font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 active:scale-[0.98]"
+                >
+                  <Sparkles className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                  <span>AI Assistant</span>
+                </button>
+              )}
+
+              {onOpenSteganography && (
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    onOpenSteganography();
+                  }}
+                  className="flex items-center gap-2 rounded-xl p-2.5 text-xs font-semibold text-cyan-800 bg-cyan-50 dark:bg-cyan-950/40 dark:text-cyan-300 active:scale-[0.98]"
+                >
+                  <Shield className="h-3.5 w-3.5 text-cyan-600 dark:text-cyan-400" />
+                  <span>Stego Studio</span>
+                </button>
+              )}
+
+              {onOpenIOSLaunch && (
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    onOpenIOSLaunch();
+                  }}
+                  className="flex items-center gap-2 rounded-xl p-2.5 text-xs font-semibold text-neutral-800 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800 active:scale-[0.98]"
+                >
+                  <Smartphone className="h-3.5 w-3.5 text-indigo-500" />
+                  <span>iOS App</span>
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between border-t border-neutral-100 pt-2.5 dark:border-neutral-800">
+              {onOpenPayment ? (
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    onOpenPayment();
+                  }}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white"
+                >
+                  <Lock className="h-3.5 w-3.5 text-indigo-500" />
+                  <span>{isPaid ? 'E2EE Active' : `Unlock E2EE (₹${e2eePrice})`}</span>
+                </button>
+              ) : <div />}
+
+              {onOpenAdmin && (
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
+                    onClick={() => {
                       setMobileMenuOpen(false);
-                      onAdminLogout();
+                      onOpenAdmin();
                     }}
-                    className="flex items-center gap-1 text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 px-2 py-1 rounded-lg border border-rose-200 dark:bg-rose-950/60 dark:border-rose-900/60"
+                    className="flex items-center gap-1.5 text-xs font-bold text-amber-600 dark:text-amber-400"
                   >
-                    <LogOut className="h-3.5 w-3.5" />
-                    <span>Logout</span>
+                    <Shield className="h-3.5 w-3.5" />
+                    <span>{isAdminAuthenticated ? 'Admin Panel' : 'Admin Console'}</span>
                   </button>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+
+                  {isAdminAuthenticated && onAdminLogout && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMobileMenuOpen(false);
+                        onAdminLogout();
+                      }}
+                      className="flex items-center gap-1 text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 px-2 py-1 rounded-lg border border-rose-200 dark:bg-rose-950/60 dark:border-rose-900/60"
+                    >
+                      <LogOut className="h-3.5 w-3.5" />
+                      <span>Logout</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </header>
   );
 };

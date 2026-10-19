@@ -28,6 +28,7 @@ import {
   Loader2,
   Shield,
   KeyRound,
+  Eye,
 } from 'lucide-react';
 import { formatBytes, getFileCategory, FileCategory } from '../utils/format';
 import { TransferHistoryItem, TransferProgress } from '../types';
@@ -64,6 +65,8 @@ interface FileDropZoneProps {
   history?: TransferHistoryItem[];
   currentTransfer?: TransferProgress | null;
   onOpenCodeTransfer?: () => void;
+  onPreviewFile?: (file: File) => void;
+  onOpenQueueManager?: () => void;
 }
 
 function formatTimeAgo(timestamp: number): string {
@@ -96,6 +99,8 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
   history = [],
   currentTransfer = null,
   onOpenCodeTransfer,
+  onPreviewFile,
+  onOpenQueueManager,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [showAllHistory, setShowAllHistory] = useState(false);
@@ -881,7 +886,18 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
                 </span>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {onOpenQueueManager && (
+                  <button
+                    type="button"
+                    onClick={onOpenQueueManager}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-900/60 dark:bg-indigo-950/60 dark:text-indigo-300 transition"
+                    title="Open multi-device assignment & parallel batched queue"
+                  >
+                    <Layers className="h-3.5 w-3.5" />
+                    <span>Queue Manager</span>
+                  </button>
+                )}
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   className="flex items-center gap-1 text-xs text-neutral-600 hover:text-neutral-950 dark:text-neutral-400 dark:hover:text-white"
@@ -999,8 +1015,27 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
                       className="flex items-center justify-between py-2.5 group hover:bg-neutral-50/70 dark:hover:bg-neutral-800/40 rounded-xl px-2 transition"
                     >
                       <div className="flex items-center gap-3 min-w-0 pr-3">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 dark:bg-neutral-800">
-                          {renderFileIcon(category)}
+                        <div
+                          onClick={() => onPreviewFile && onPreviewFile(file)}
+                          className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl overflow-hidden border border-neutral-200 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-800 shadow-inner ${
+                            onPreviewFile ? 'cursor-pointer hover:ring-2 hover:ring-indigo-500/50 transition-all group/thumb' : ''
+                          }`}
+                          title={onPreviewFile ? 'Click to preview' : undefined}
+                        >
+                          {file.type.startsWith('image/') ? (
+                            <img
+                              src={URL.createObjectURL(file)}
+                              alt={file.name}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            renderFileIcon(category)
+                          )}
+                          {onPreviewFile && (
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/thumb:opacity-100 flex items-center justify-center text-white transition">
+                              <Eye className="h-3.5 w-3.5" />
+                            </div>
+                          )}
                         </div>
                         <div className="truncate">
                           <p className="truncate text-xs font-semibold text-neutral-900 dark:text-white font-mono" title={file.name}>
@@ -1048,6 +1083,20 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({
                           <Shield className="h-3 w-3" />
                           <span className="hidden sm:inline">Stego</span>
                         </button>
+
+                        {onPreviewFile && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onPreviewFile(file);
+                            }}
+                            className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-100 hover:text-indigo-600 transition dark:hover:bg-neutral-800 dark:hover:text-indigo-400"
+                            title="Instant preview this file"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                          </button>
+                        )}
 
                         {/* File Action Context Menu Trigger Button */}
                         <button
